@@ -56,7 +56,7 @@ def run():
     try:
         gemini_key = st.secrets["GEMINI_API_KEY"]
         
-        # KUNCI PERBAIKAN: Paksa Gemini menggunakan jalur REST dan tetapkan API Key di environment
+        # Paksa Gemini menggunakan jalur REST dan tetapkan API Key di environment
         os.environ["GOOGLE_API_KEY"] = gemini_key
         genai.configure(api_key=gemini_key, transport="rest")
     except Exception as e:
@@ -66,17 +66,16 @@ def run():
     st.title("📝 Ruang 1: Rapat Naskah Direktur Kreatif")
     st.info("💡 **Tips:** Jawab pertanyaan Direktur di bawah ini.")
 
-    # KUNCI PERBAIKAN 2: Ubah nama memori chat menjadi v2 agar riwayat error sebelumnya terhapus
-    if "chat_session_naskah_v2" not in st.session_state:
-        # Gunakan prefix 'models/' agar server tidak bingung mencari nama model
+    # KUNCI PERBAIKAN: Hapus prefix 'models/' dan gunakan v3 untuk memori bersih
+    if "chat_session_naskah_v3" not in st.session_state:
         model_direktur = genai.GenerativeModel(
-            model_name="models/gemini-1.5-flash",
+            model_name="gemini-1.5-flash", # Penulisan standar yang benar
             system_instruction=DIREKTUR_PROMPT
         )
-        st.session_state.chat_session_naskah_v2 = model_direktur.start_chat(history=[])
-        st.session_state.chat_session_naskah_v2.send_message("Halo Direktur, saya siap membuat naskah baru. Tolong mulai tahap wawancaranya.")
+        st.session_state.chat_session_naskah_v3 = model_direktur.start_chat(history=[])
+        st.session_state.chat_session_naskah_v3.send_message("Halo Direktur, saya siap membuat naskah baru. Tolong mulai tahap wawancaranya.")
 
-    for message in st.session_state.chat_session_naskah_v2.history[1:]:
+    for message in st.session_state.chat_session_naskah_v3.history[1:]:
         role = "assistant" if message.role == "model" else "user"
         with st.chat_message(role):
             st.markdown(message.parts[0].text)
@@ -86,7 +85,7 @@ def run():
             st.markdown(prompt_user)
         with st.chat_message("assistant"):
             try:
-                response = st.session_state.chat_session_naskah_v2.send_message(prompt_user)
+                response = st.session_state.chat_session_naskah_v3.send_message(prompt_user)
                 st.markdown(response.text)
             except Exception as e:
                 st.error(f"Error AI: {e}")
