@@ -25,7 +25,11 @@ def run():
 
     col1, col2 = st.columns(2)
     with col1:
-        gender = st.selectbox("Pilih Jenis Suara:", ["Wanita (Neural2-A)", "Pria (Neural2-B)"])
+        # PERBAIKAN: Mengganti Neural2 menjadi Wavenet (Suara premium untuk Bahasa Indonesia)
+        gender = st.selectbox(
+            "Pilih Jenis Suara:", 
+            ["Wanita (Wavenet-A)", "Pria (Wavenet-B)", "Pria (Wavenet-C)", "Wanita (Wavenet-D)"]
+        )
     with col2:
         speed = st.slider("Kecepatan Bicara:", 0.5, 1.5, 1.0, 0.1)
 
@@ -39,7 +43,16 @@ def run():
                     naskah_bersih = user_input.replace("[", "").replace("]", "").replace("(", "").replace(")", "")
                     
                     synthesis_input = texttospeech.SynthesisInput(text=naskah_bersih)
-                    voice_name = "id-ID-Neural2-A" if "Wanita" in gender else "id-ID-Neural2-B"
+                    
+                    # PERBAIKAN: Logika pemilihan kode suara Google Cloud yang valid
+                    if "Wavenet-A" in gender:
+                        voice_name = "id-ID-Wavenet-A"
+                    elif "Wavenet-B" in gender:
+                        voice_name = "id-ID-Wavenet-B"
+                    elif "Wavenet-C" in gender:
+                        voice_name = "id-ID-Wavenet-C"
+                    else:
+                        voice_name = "id-ID-Wavenet-D"
                     
                     voice = texttospeech.VoiceSelectionParams(language_code="id-ID", name=voice_name)
                     audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=speed)
