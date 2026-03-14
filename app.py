@@ -81,7 +81,7 @@ tab1, tab2 = st.tabs(["📝 Ruang 1: Rapat Naskah (Chat)", "🎧 Ruang 2: Studio
 # TAB 1: RUANG RAPAT DIREKTUR KREATIF
 # ==========================================
 with tab1:
-    st.info("💡 **Tips:** Jawab pertanyaan Direktur di bawah ini untuk memulai proses kreatif.")
+    st.info("💡 **Tips:** Jawab pertanyaan Direktur Kreatif di bawah ini untuk memulai proses kreatif.")
     
     # Inisialisasi sesi obrolan (Chat Session)
     if "chat_session" not in st.session_state:
@@ -102,7 +102,7 @@ with tab1:
             st.markdown(message.parts[0].text)
 
     # Kotak Input Chat
-    if prompt_user := st.chat_input("Ketik jawaban atau instruksi Anda di sini..."):
+    if prompt_user := st.chat_input("Ketik di sini, apa naskah yang mau Anda produksi?"):
         # Tampilkan chat user
         with st.chat_message("user"):
             st.markdown(prompt_user)
