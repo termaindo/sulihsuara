@@ -6,41 +6,24 @@ def run():
     # --- 1. KARANTINA MEMORI SISTEM ---
     os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
-    # --- 2. PROMPT DIREKTUR KREATIF (DISESUAIKAN UNTUK MODE FORMULIR) ---
+    # --- 2. PROMPT DIREKTUR KREATIF (VERSI SIMPEL & PRAKTIS) ---
     DIREKTUR_PROMPT = """
 [PERAN & PERSONA]
-Kamu adalah Direktur Kreatif Script Alih Suara yang puitis namun teknis. Tugasmu adalah membantu pengguna menyusun naskah Text-to-Speech (TTS) yang memiliki "jiwa". Kamu menggunakan analogi untuk menjelaskan suasana dan sangat presisi dalam menghitung durasi.
+Kamu adalah Direktur Kreatif Script Alih Suara. Tugasmu adalah membantu pengguna awam menyusun naskah Text-to-Speech (TTS) yang menarik, natural, dan memiliki "jiwa".
 
 [ALUR KERJA]
-Pengguna sudah mengisi formulir wawancara. Berdasarkan rangkuman data yang diberikan pengguna, langsung lakukan dua langkah berikut:
+Pengguna sudah mengisi formulir wawancara terkait naskah yang mereka butuhkan. Berdasarkan data yang diberikan, buatlah output dengan struktur sederhana berikut:
 
-1. Tahap Opsi Nuansa (Creative Pitch)
-Sajikan 2-3 Pilihan Nuansa dalam tabel:
-- Nuansa: Nama gaya (misal: "Zen", "Energetik", "Informatif").
-- Visualisasi Suasana: Analogi puitis (misal: "Seperti embun di pagi hari").
-- Rangkuman Alur: Penjelasan porsi waktu Hook-Heart-Action sesuai audiens.
+1. 💡 Alasan Kreatif:
+Berikan penjelasan singkat (1-2 paragraf pendek) dengan bahasa awam yang ramah tentang mengapa naskah ini disusun seperti ini. Jelaskan bagaimana pemilihan kata, gaya bahasa, dan alurnya disesuaikan dengan produk, keunggulan, dan target audiens mereka.
 
-2. Tahap Eksekusi (Final Script)
-Sajikan SATU naskah final terbaik dari opsi nuansa yang paling relevan dengan struktur:
-### 🎙️ [Judul Proyek]
-- Tabel Metadata: Target Durasi, Laju Bicara, dan Jumlah Kata Aktual.
-- Tabel Identitas Suara: Persona & Suasana.
-- Tabel Perbandingan Ritme: Bandingkan versi Tight Sync (Pas) dan Breathable (Longgar).
-- Blok Kode Naskah: Gunakan tag [Jeda: 0.0s] dan (Instruksi Emosi).
-- Catatan Sutradara: Rekomendasi Pitch/Speed TTS dan Atmosfer Audio (Musik/SFX).
+2. 🎙️ Naskah Final:
+Sajikan SATU naskah final yang siap di-copy-paste ke mesin pembuat suara (TTS).
+- Gunakan tanda baca yang jelas (koma, titik) untuk memandu jeda napas mesin TTS.
+- Sisipkan instruksi jeda sederhana jika perlu, misalnya [jeda sejenak].
+- Pastikan jumlah kata sesuai dengan durasi yang diminta (referensi: Bahasa Indonesia sekitar 2.1 - 2.5 kata per detik).
 
-[LOGIKA TEKNIS DURASI]
-Gunakan referensi berikut untuk menghitung batas kata:
-1) Bahasa Indonesia: 
-a) Gaya cepat: 2,6 - 2,8 wps
-b) Gaya normal: 2.1 - 2.3 wps
-2) Bahasa Inggris:
-a) Gaya cepat: 2.9 - 3.2 wps
-b) Gaya normal: 2.4 - 2.6 wps
-(wps = words per second).
-
-[GAYA BAHASA]
-Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah industri seperti "pacing", "intonasi", dan "vocal fry" jika relevan, beri penjelasan sederhana.
+PENTING: Jangan tampilkan tabel metadata, perbandingan ritme, atau istilah teknis industri yang rumit. Buat sesederhana dan sepraktis mungkin untuk pengguna awam.
     """
 
     # --- 3. SETUP KREDENSIAL GEMINI ---
@@ -53,43 +36,62 @@ Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah i
 
     st.title("📝 Ruang 1: Rapat Naskah Direktur Kreatif")
 
-    # --- 4. INISIALISASI STATE (WIZARD) ---
+    # --- 4. INISIALISASI STATE (WIZARD 8 LANGKAH) ---
     if "wizard_step" not in st.session_state:
         st.session_state.wizard_step = 1
-        st.session_state.jawaban = {"durasi": "", "audiens": "", "vibe": "", "konteks": "", "tambahan": ""}
+        st.session_state.jawaban = {
+            "produk": "", 
+            "poin_penting": "", 
+            "durasi": "", 
+            "audiens": "", 
+            "vibe": "", 
+            "konteks": "", 
+            "tambahan": ""
+        }
         st.session_state.hasil_naskah = ""
 
     # ==========================================
-    # LANGKAH 1: DURASI
+    # LANGKAH 1: PRODUK / JASA (BARU)
     # ==========================================
     if st.session_state.wizard_step == 1:
-        st.subheader("Langkah 1 dari 4: Target Durasi")
-        pilihan = st.selectbox("Berapa detik target durasi naskah Anda?", 
-                               ["Pilih...", "15 detik (Singkat / Hook)", "30 detik (Standar Iklan/Reels)", "60 detik (Edukasi / Penjelasan)", "Isi sendiri..."])
+        st.subheader("Langkah 1 dari 6: Produk atau Jasa")
+        pilihan = st.selectbox("Apa produk atau jasa yang ingin Anda buatkan narasinya?", 
+                               ["Pilih...", 
+                                "Produk Kesehatan & Suplemen", 
+                                "Makanan & Minuman", 
+                                "Layanan / Jasa Komunitas", 
+                                "Barang Elektronik / Gadget", 
+                                "Acara / Webinar",
+                                "Isi sendiri..."])
         
         jawaban_final = pilihan
         if pilihan == "Isi sendiri...":
-            jawaban_final = st.text_input("Masukkan durasi yang Anda inginkan (misal: 45 detik):")
+            jawaban_final = st.text_input("Sebutkan produk atau jasa Anda:")
 
         if st.button("Selanjutnya ➡️"):
             if jawaban_final and jawaban_final != "Pilih...":
-                st.session_state.jawaban["durasi"] = jawaban_final
+                st.session_state.jawaban["produk"] = jawaban_final
                 st.session_state.wizard_step = 2
                 st.rerun()
             else:
-                st.warning("Mohon pilih atau isi durasi terlebih dahulu.")
+                st.warning("Mohon pilih atau isi produk/jasa terlebih dahulu.")
 
     # ==========================================
-    # LANGKAH 2: AUDIENS
+    # LANGKAH 2: POIN PENTING (BARU)
     # ==========================================
     elif st.session_state.wizard_step == 2:
-        st.subheader("Langkah 2 dari 4: Target Audiens")
-        pilihan = st.selectbox("Siapa pendengar utama naskah ini?", 
-                               ["Pilih...", "Pensiunan / Komunitas Senior (Jelas, santai, hormat)", "Profesional / Pekerja Kantoran (Formal, padat, lugas)", "Generasi Muda / Gen Z (Cepat, kasual, gaul)", "Ibu Rumah Tangga (Hangat, akrab, praktis)", "Isi sendiri..."])
+        st.subheader("Langkah 2 dari 6: Poin Penting / Keunggulan")
+        pilihan = st.selectbox("Apa pesan utama atau keunggulan yang WAJIB disampaikan?", 
+                               ["Pilih...", 
+                                "Manfaat kesehatan & bahan alami yang digunakan", 
+                                "Promo diskon terbatas & harga spesial", 
+                                "Solusi praktis untuk masalah sehari-hari", 
+                                "Ajakan bergabung ke komunitas / acara",
+                                "Isi sendiri..."])
         
         jawaban_final = pilihan
         if pilihan == "Isi sendiri...":
-            jawaban_final = st.text_input("Masukkan target audiens Anda:")
+            jawaban_final = st.text_area("Tuliskan poin penting/keunggulan produk Anda:")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -99,23 +101,23 @@ Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah i
         with col2:
             if st.button("Selanjutnya ➡️"):
                 if jawaban_final and jawaban_final != "Pilih...":
-                    st.session_state.jawaban["audiens"] = jawaban_final
+                    st.session_state.jawaban["poin_penting"] = jawaban_final
                     st.session_state.wizard_step = 3
                     st.rerun()
                 else:
-                    st.warning("Mohon pilih atau isi audiens terlebih dahulu.")
+                    st.warning("Mohon pilih atau isi poin penting terlebih dahulu.")
 
     # ==========================================
-    # LANGKAH 3: VIBE / EMOSI
+    # LANGKAH 3: DURASI
     # ==========================================
     elif st.session_state.wizard_step == 3:
-        st.subheader("Langkah 3 dari 4: Vibe & Emosi")
-        pilihan = st.selectbox("Perasaan apa yang ingin dibangun?", 
-                               ["Pilih...", "Semangat & Menggebu-gebu (Energetik/Promosi)", "Tenang & Meyakinkan (Edukatif/Kesehatan)", "Santai & Menghibur (Rileks/Kasual)", "Isi sendiri..."])
+        st.subheader("Langkah 3 dari 6: Target Durasi")
+        pilihan = st.selectbox("Berapa detik target durasi naskah Anda?", 
+                               ["Pilih...", "15 detik (Singkat / Iklan Cepat)", "30 detik (Standar Iklan/Reels)", "60 detik (Edukasi / Penjelasan Lengkap)", "Isi sendiri..."])
         
         jawaban_final = pilihan
         if pilihan == "Isi sendiri...":
-            jawaban_final = st.text_input("Masukkan vibe/emosi yang Anda inginkan:")
+            jawaban_final = st.text_input("Masukkan durasi yang Anda inginkan (misal: 45 detik):")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -125,23 +127,30 @@ Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah i
         with col2:
             if st.button("Selanjutnya ➡️"):
                 if jawaban_final and jawaban_final != "Pilih...":
-                    st.session_state.jawaban["vibe"] = jawaban_final
+                    st.session_state.jawaban["durasi"] = jawaban_final
                     st.session_state.wizard_step = 4
                     st.rerun()
                 else:
-                    st.warning("Mohon pilih atau isi vibe terlebih dahulu.")
+                    st.warning("Mohon pilih atau isi durasi terlebih dahulu.")
 
     # ==========================================
-    # LANGKAH 4: KONTEKS
+    # LANGKAH 4: AUDIENS & VIBE (DIGABUNG AGAR CEPAT)
     # ==========================================
     elif st.session_state.wizard_step == 4:
-        st.subheader("Langkah 4 dari 4: Konteks Penggunaan")
-        pilihan = st.selectbox("Naskah ini akan digunakan untuk platform apa?", 
-                               ["Pilih...", "Video Edukasi Pendek (TikTok/Reels/Shorts)", "Audio Presentasi / Penjelasan Produk", "Voice Over Video YouTube", "Isi sendiri..."])
+        st.subheader("Langkah 4 dari 6: Audiens & Suasana")
+        pilihan_audiens = st.selectbox("Siapa pendengar utama naskah ini?", 
+                               ["Pilih...", "Pensiunan / Senior (Jelas, santai, hormat)", "Profesional / Pekerja (Formal, padat, lugas)", "Anak Muda / Gen Z (Cepat, kasual, gaul)", "Ibu Rumah Tangga (Hangat, akrab, praktis)", "Isi sendiri..."])
         
-        jawaban_final = pilihan
-        if pilihan == "Isi sendiri...":
-            jawaban_final = st.text_input("Masukkan konteks penggunaan Anda:")
+        jawaban_audiens = pilihan_audiens
+        if pilihan_audiens == "Isi sendiri...":
+            jawaban_audiens = st.text_input("Masukkan target audiens Anda:")
+
+        pilihan_vibe = st.selectbox("Perasaan apa yang ingin dibangun?", 
+                               ["Pilih...", "Semangat & Menggebu-gebu (Promosi)", "Tenang & Meyakinkan (Kesehatan/Edukasi)", "Santai & Menghibur (Kasual)", "Isi sendiri..."])
+        
+        jawaban_vibe = pilihan_vibe
+        if pilihan_vibe == "Isi sendiri...":
+            jawaban_vibe = st.text_input("Masukkan vibe/emosi yang Anda inginkan:")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -150,88 +159,62 @@ Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah i
                 st.rerun()
         with col2:
             if st.button("Selanjutnya ➡️"):
-                if jawaban_final and jawaban_final != "Pilih...":
-                    st.session_state.jawaban["konteks"] = jawaban_final
+                if jawaban_audiens and jawaban_vibe and jawaban_audiens != "Pilih..." and jawaban_vibe != "Pilih...":
+                    st.session_state.jawaban["audiens"] = jawaban_audiens
+                    st.session_state.jawaban["vibe"] = jawaban_vibe
                     st.session_state.wizard_step = 5
                     st.rerun()
                 else:
-                    st.warning("Mohon pilih atau isi konteks terlebih dahulu.")
+                    st.warning("Mohon lengkapi audiens dan suasana terlebih dahulu.")
 
     # ==========================================
-    # LANGKAH 5: RANGKUMAN & KOREKSI FINAL
+    # LANGKAH 5: KONTEKS & RANGKUMAN FINAL
     # ==========================================
     elif st.session_state.wizard_step == 5:
-        st.subheader("📋 Koreksi Rangkuman Panduan Naskah")
-        st.info("Silakan periksa dan perbaiki jika ada yang kurang pas sebelum diserahkan ke Direktur Kreatif AI.")
+        st.subheader("Langkah 5 dari 6: Konteks & Koreksi")
+        
+        pilihan_konteks = st.selectbox("Naskah ini akan digunakan untuk platform apa?", 
+                               ["Pilih...", "Video Pendek (TikTok/Reels/Shorts)", "Audio Presentasi / Komunitas", "Voice Over Video YouTube", "Isi sendiri..."])
+        
+        jawaban_konteks = pilihan_konteks
+        if pilihan_konteks == "Isi sendiri...":
+            jawaban_konteks = st.text_input("Masukkan platform tujuan Anda:")
 
-        # Pengguna bisa mengedit ulang di kolom ini jika mau
-        edit_durasi = st.text_input("1. Target Durasi", value=st.session_state.jawaban["durasi"])
-        edit_audiens = st.text_input("2. Target Audiens", value=st.session_state.jawaban["audiens"])
-        edit_vibe = st.text_input("3. Vibe/Emosi", value=st.session_state.jawaban["vibe"])
-        edit_konteks = st.text_input("4. Konteks Penggunaan", value=st.session_state.jawaban["konteks"])
-        edit_tambahan = st.text_area("5. Catatan Tambahan (Opsional)", placeholder="Misal: Tolong wajib masukkan istilah 'Autofagi' atau 'Mocaf' di dalam naskah.")
+        st.divider()
+        st.info("📋 **Periksa Kembali Panduan Naskah Anda:**\nSilakan edit langsung di dalam kotak jika ada yang ingin diubah sebelum diserahkan ke AI.")
+
+        # Pengguna bisa mengedit ulang semua rangkuman di sini
+        edit_produk = st.text_input("1. Produk/Jasa", value=st.session_state.jawaban["produk"])
+        edit_poin = st.text_input("2. Poin Penting", value=st.session_state.jawaban["poin_penting"])
+        edit_durasi = st.text_input("3. Target Durasi", value=st.session_state.jawaban["durasi"])
+        edit_audiens = st.text_input("4. Target Audiens", value=st.session_state.jawaban["audiens"])
+        edit_vibe = st.text_input("5. Suasana", value=st.session_state.jawaban["vibe"])
+        
+        # Tambahan catatan diletakkan di akhir
+        edit_tambahan = st.text_area("Catatan Tambahan (Opsional)", placeholder="Misal: Wajib sebutkan kata 'Autofagi' atau 'KTBUKM Jatim'.")
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("⬅️ Ulangi dari Awal"):
-                st.session_state.wizard_step = 1
+            if st.button("⬅️ Kembali"):
+                st.session_state.wizard_step = 4
                 st.rerun()
         with col2:
             if st.button("✨ Hasilkan Naskah Sekarang", type="primary"):
-                # Simpan hasil koreksi final
-                st.session_state.jawaban["durasi"] = edit_durasi
-                st.session_state.jawaban["audiens"] = edit_audiens
-                st.session_state.jawaban["vibe"] = edit_vibe
-                st.session_state.jawaban["konteks"] = edit_konteks
-                st.session_state.jawaban["tambahan"] = edit_tambahan
-                st.session_state.wizard_step = 6
-                st.rerun()
+                if jawaban_konteks and jawaban_konteks != "Pilih...":
+                    st.session_state.jawaban["konteks"] = jawaban_konteks
+                    st.session_state.jawaban["produk"] = edit_produk
+                    st.session_state.jawaban["poin_penting"] = edit_poin
+                    st.session_state.jawaban["durasi"] = edit_durasi
+                    st.session_state.jawaban["audiens"] = edit_audiens
+                    st.session_state.jawaban["vibe"] = edit_vibe
+                    st.session_state.jawaban["tambahan"] = edit_tambahan
+                    st.session_state.wizard_step = 6
+                    st.rerun()
+                else:
+                    st.warning("Mohon pilih atau isi konteks platform terlebih dahulu.")
 
     # ==========================================
     # LANGKAH 6: PROSES AI & HASIL
     # ==========================================
     elif st.session_state.wizard_step == 6:
-        st.subheader("🎬 Hasil Naskah Direktur Kreatif")
-
-        if not st.session_state.hasil_naskah:
-            with st.spinner("Menyusun opsi nuansa dan menulis naskah final... (Tunggu sekitar 10-15 detik)"):
-                try:
-                    model_direktur = genai.GenerativeModel(
-                        model_name="gemini-2.5-flash",
-                        system_instruction=DIREKTUR_PROMPT
-                    )
-                    
-                    # Menyusun paket data dari rangkuman untuk dikirim ke Gemini
-                    prompt_final = f"""
-                    Berikut adalah data panduan naskah saya:
-                    - Durasi Target: {st.session_state.jawaban['durasi']}
-                    - Target Audiens: {st.session_state.jawaban['audiens']}
-                    - Vibe/Emosi: {st.session_state.jawaban['vibe']}
-                    - Konteks Platform: {st.session_state.jawaban['konteks']}
-                    - Catatan Tambahan/Kata Wajib: {st.session_state.jawaban['tambahan'] if st.session_state.jawaban['tambahan'] else "Tidak ada"}
-                    
-                    Tolong eksekusi pembuatan naskah sekarang sesuai alur kerjamu.
-                    """
-                    
-                    response = model_direktur.generate_content(prompt_final)
-                    st.session_state.hasil_naskah = response.text
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan saat menghubungi AI: {e}")
-                    if st.button("Coba Lagi"):
-                        st.rerun()
-        else:
-            # Menampilkan naskah yang sudah selesai
-            st.markdown(st.session_state.hasil_naskah)
-
-            st.divider()
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔄 Revisi Rangkuman (Buat Ulang)"):
-                    st.session_state.hasil_naskah = ""
-                    st.session_state.wizard_step = 5
-                    st.rerun()
-            with col2:
-                if st.button("🚀 Naskah Selesai? Lanjut ke Studio Rekaman (VO)", use_container_width=True):
-                    st.session_state.menu_aktif = "2. Studio Rekaman"
-                    st.rerun()
+        st.subheader("
