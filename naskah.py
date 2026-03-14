@@ -62,24 +62,24 @@ Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah i
     st.info("💡 **Tips:** Jawab pertanyaan Direktur di bawah ini untuk memulai proses kreatif pembuatan naskah yang berjiwa.")
 
     # --- 5. LOGIKA CHAT AI ---
-    if "chat_naskah_v4" not in st.session_state:
-        # KOREKSI: Gunakan fully qualified model name
+    # KUNCI PERBAIKAN 1: Naikkan ke v5 untuk mereset memori error Streamlit
+    if "chat_naskah_v5" not in st.session_state:
+        # KUNCI PERBAIKAN 2: Hapus 'models/' dari penulisan nama model
         model_direktur = genai.GenerativeModel(
-            model_name="models/gemini-1.5-flash", 
+            model_name="gemini-1.5-flash", 
             system_instruction=DIREKTUR_PROMPT
         )
-        st.session_state.chat_naskah_v4 = model_direktur.start_chat(history=[])
+        st.session_state.chat_naskah_v5 = model_direktur.start_chat(history=[])
         
-        # KOREKSI: Bungkus pesan pancingan awal dengan error handling
         try:
-            st.session_state.chat_naskah_v4.send_message("Halo Direktur, saya siap membuat naskah baru. Tolong mulai tahap wawancaranya.")
+            st.session_state.chat_naskah_v5.send_message("Halo Direktur, saya siap membuat naskah baru. Tolong mulai tahap wawancaranya.")
         except Exception as e:
-            st.error(f"Gagal menghubungi server Gemini API. Pastikan model tersedia dan API Key valid. Detail: {e}")
-            st.stop() # Hentikan eksekusi agar tidak terjadi cascade error
+            st.error(f"Gagal menghubungi server Gemini API. Detail: {e}")
+            st.stop()
 
     # Menampilkan riwayat chat ke layar (kecuali pesan pancingan awal)
-    if len(st.session_state.chat_naskah_v4.history) > 1:
-        for message in st.session_state.chat_naskah_v4.history[1:]:
+    if len(st.session_state.chat_naskah_v5.history) > 1:
+        for message in st.session_state.chat_naskah_v5.history[1:]:
             role = "assistant" if message.role == "model" else "user"
             with st.chat_message(role):
                 try:
@@ -94,9 +94,8 @@ Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah i
             
         with st.chat_message("assistant"):
             try:
-                # KOREKSI: Tambahkan spinner untuk UX yang lebih baik
                 with st.spinner("Direktur sedang menyusun strategi..."):
-                    response = st.session_state.chat_naskah_v4.send_message(prompt_user)
+                    response = st.session_state.chat_naskah_v5.send_message(prompt_user)
                     st.markdown(response.text)
             except Exception as e:
                 st.error(f"Mohon maaf, terjadi gangguan pada komunikasi AI: {e}")
