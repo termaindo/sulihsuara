@@ -3,7 +3,7 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.oauth2 import service_account
 import json
-import os  # Mutlak diperlukan untuk menghapus memori sistem
+import os
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Studio Alih Suara Pro", page_icon="🎙️", layout="wide")
@@ -50,9 +50,8 @@ b) Gaya normal: 2.4 - 2.6 wps
 Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah industri seperti "pacing", "intonasi", dan "vocal fry" jika relevan, dan beri penjelasan sederhana dan singkat untuk istilah teknis tersebut, supaya bisa dipahami juga oleh orang awam pemakai jasamu.
 """
 
-# --- SETUP KREDENSIAL (DENGAN PEMBERSIHAN MEMORI) ---
+# --- SETUP KREDENSIAL (MEMORI BERSIH) ---
 try:
-    # KUNCI PERBAIKAN: Hapus sisa ingatan kredensial Google Cloud dari memori sistem!
     if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
         del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
 
@@ -87,20 +86,20 @@ tab1, tab2 = st.tabs(["📝 Ruang 1: Rapat Naskah (Chat)", "🎧 Ruang 2: Studio
 with tab1:
     st.info("💡 **Tips:** Jawab pertanyaan Direktur Kreatif di bawah ini untuk memulai proses kreatif.")
     
-    # Inisialisasi sesi obrolan (Chat Session)
-    if "chat_session" not in st.session_state:
+    # KUNCI PERBAIKAN: Menggunakan nama variabel baru 'chat_session_v2' agar memori lama dibuang
+    if "chat_session_v2" not in st.session_state:
         model_direktur = genai.GenerativeModel(
             model_name="gemini-1.5-flash",
             system_instruction=DIREKTUR_PROMPT
         )
-        # Memulai chat kosong
-        st.session_state.chat_session = model_direktur.start_chat(history=[])
+        # Memulai chat baru
+        st.session_state.chat_session_v2 = model_direktur.start_chat(history=[])
         
         # Pancingan agar Direktur menyapa duluan
-        st.session_state.chat_session.send_message("Halo Direktur, saya siap membuat naskah baru. Tolong mulai tahap wawancaranya.")
+        st.session_state.chat_session_v2.send_message("Halo Direktur, saya siap membuat naskah baru. Tolong mulai tahap wawancaranya.")
     
     # Menampilkan riwayat chat
-    for message in st.session_state.chat_session.history[1:]: # Skip pesan pancingan sistem
+    for message in st.session_state.chat_session_v2.history[1:]: # Skip pesan pancingan sistem
         role = "assistant" if message.role == "model" else "user"
         with st.chat_message(role):
             st.markdown(message.parts[0].text)
@@ -112,7 +111,7 @@ with tab1:
             st.markdown(prompt_user)
         # Kirim ke Gemini dan tampilkan balasan
         with st.chat_message("assistant"):
-            response = st.session_state.chat_session.send_message(prompt_user)
+            response = st.session_state.chat_session_v2.send_message(prompt_user)
             st.markdown(response.text)
 
 # ==========================================
@@ -133,10 +132,8 @@ with tab2:
         if user_input:
             try:
                 with st.spinner("Google Cloud sedang memproduksi suara..."):
-                    # Masukkan credentials secara spesifik HANYA ke klien TTS
                     client = texttospeech.TextToSpeechClient(credentials=tts_credentials)
                     
-                    # Membersihkan tag [Jeda] atau (Emosi) agar tidak ikut terbaca oleh robot
                     naskah_bersih = user_input.replace("[", "").replace("]", "").replace("(", "").replace(")", "")
                     
                     synthesis_input = texttospeech.SynthesisInput(text=naskah_bersih)
