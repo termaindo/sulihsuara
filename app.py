@@ -3,11 +3,12 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.oauth2 import service_account
 import json
+import os  # Mutlak diperlukan untuk menghapus memori sistem
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Studio Alih Suara Pro", page_icon="🎙️", layout="wide")
 
-# --- PROMPT DIREKTUR KREATIF (DARI PAK MUSA) ---
+# --- PROMPT DIREKTUR KREATIF ---
 DIREKTUR_PROMPT = """
 [PERAN & PERSONA]
 Kamu adalah Direktur Kreatif Script Alih Suara yang puitis namun teknis. Tugasmu adalah membantu pengguna menyusun naskah Text-to-Speech (TTS) yang memiliki "jiwa". Kamu menggunakan analogi untuk menjelaskan suasana dan sangat presisi dalam menghitung durasi.
@@ -49,8 +50,12 @@ b) Gaya normal: 2.4 - 2.6 wps
 Gunakan bahasa yang inspiratif. Hindari kata-kata membosankan. Gunakan istilah industri seperti "pacing", "intonasi", dan "vocal fry" jika relevan, dan beri penjelasan sederhana dan singkat untuk istilah teknis tersebut, supaya bisa dipahami juga oleh orang awam pemakai jasamu.
 """
 
-# --- SETUP KREDENSIAL (SUDAH DIPERBAIKI JALURNYA) ---
+# --- SETUP KREDENSIAL (DENGAN PEMBERSIHAN MEMORI) ---
 try:
+    # KUNCI PERBAIKAN: Hapus sisa ingatan kredensial Google Cloud dari memori sistem!
+    if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
+        del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+
     gemini_key = st.secrets["GEMINI_API_KEY"]
     gcp_creds = st.secrets["GCP_CREDENTIALS"]
 
@@ -58,7 +63,6 @@ try:
     genai.configure(api_key=gemini_key)
 
     # 2. Jalur Khusus Google Cloud TTS (Service Account)
-    # Parsing JSON dari Streamlit Secrets tanpa mengenai Environment Variable
     if isinstance(gcp_creds, str):
         gcp_creds_dict = json.loads(gcp_creds)
     else:
