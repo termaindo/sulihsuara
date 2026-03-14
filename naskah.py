@@ -99,11 +99,11 @@ PENTING: Pastikan teks di dalam SSML tetap bersih dan enak didengar.
             st.rerun()
 
     elif st.session_state.wizard_step == 6:
-        st.subheader("🎬 Hasil Naskah Pro (Format SSML)")
+        st.subheader("🎬 Hasil Penulisan Naskah Pro")
         if not st.session_state.hasil_naskah:
-            with st.spinner("Direktur sedang menyusun naskah dengan teknik SSML..."):
+            with st.spinner("Direktur sedang menyusun naskah kreatif untuk Anda..."):
                 model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=DIREKTUR_PROMPT)
-                prompt = f"Buat naskah SSML untuk: {st.session_state.jawaban}"
+                prompt = f"Buat naskah kreatif untuk: {st.session_state.jawaban}"
                 response = model.generate_content(prompt)
                 st.session_state.hasil_naskah = response.text
                 st.rerun()
