@@ -17,7 +17,7 @@ if st.session_state.nama_pengguna == "":
     st.markdown("Sebelum kita mulai memproduksi naskah dan rekaman yang memukau, bolehkah saya tahu dengan siapa saya berinteraksi?")
     
     with st.form("form_nama"):
-        nama_input = st.text_input("Masukkan Nama Anda:", placeholder="Contoh: Bapak Musa")
+        nama_input = st.text_input("Masukkan Nama Anda:", placeholder="Contoh: Bapak Rudi")
         submit_nama = st.form_submit_button("Masuk ke Studio ➡️")
         
         if submit_nama:
@@ -51,7 +51,7 @@ st.divider()
 
 # --- ROUTER LOGIC ---
 if st.session_state.menu_aktif == "Home":
-    st.subheader(f"Selamat Datang di Lobi Studio, {st.session_state.nama_pengguna}!")
+    st.subheader(f"Selamat Datang di Lobi Studio, sobat {st.session_state.nama_pengguna}!")
     st.write("Untuk memastikan sistem berjalan tanpa gangguan memori, aplikasi ini dibagi menjadi dua ruangan. Silakan pilih ruangan yang Anda perlukan:")
     
     st.info("""
