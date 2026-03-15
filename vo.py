@@ -83,6 +83,7 @@ def run():
         """)
 
     # Kotak Teks Utama (Bisa diketik dan diedit langsung oleh pengguna)
+    st.markdown("**📱 PENGGUNA HP:** Abaikan tulisan *'Press Ctrl+Enter'* di dalam kotak. Cukup ketuk di area luar kotak atau langsung klik tombol **Produksi Suara** setelah selesai mengedit naskah.")
     user_input = st.text_area(
         "📝 Kotak Kerja Naskah (Anda BEBAS mengetik, menghapus, atau mengubah tanda baca di sini):", 
         value=st.session_state.naskah_vo, 
@@ -98,7 +99,12 @@ def run():
     with col1:
         voice_opt = st.selectbox(
             "Pilih Karakter Suara:", 
-            ["Wanita (Wavenet-A)", "Pria (Wavenet-B)", "Pria (Wavenet-C)", "Wanita (Wavenet-D)"]
+            [
+                "Wanita (Wavenet-D)", 
+                "Wanita (Wavenet-A)", 
+                "Pria (Wavenet-B)", 
+                "Pria (Wavenet-C)"
+            ]
         )
     with col2:
         speed = st.slider("Laju Bicara (Speed):", 0.5, 1.5, 1.0, 0.1)
@@ -118,17 +124,17 @@ def run():
                     
                     synthesis_input = texttospeech.SynthesisInput(text=clean_text.strip())
                     
-                    # Mapping Suara
+                    # Mapping Suara yang sudah diurutkan sesuai dropdown
                     voice_map = {
+                        "Wanita (Wavenet-D)": "id-ID-Wavenet-D",
                         "Wanita (Wavenet-A)": "id-ID-Wavenet-A",
                         "Pria (Wavenet-B)": "id-ID-Wavenet-B",
-                        "Pria (Wavenet-C)": "id-ID-Wavenet-C",
-                        "Wanita (Wavenet-D)": "id-ID-Wavenet-D"
+                        "Pria (Wavenet-C)": "id-ID-Wavenet-C"
                     }
                     
                     voice = texttospeech.VoiceSelectionParams(
                         language_code="id-ID", 
-                        name=voice_map.get(voice_opt, "id-ID-Wavenet-A")
+                        name=voice_map.get(voice_opt, "id-ID-Wavenet-D")
                     )
                     
                     audio_config = texttospeech.AudioConfig(
