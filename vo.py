@@ -25,7 +25,7 @@ def run():
     
     # --- 2. LOGIKA PENARIKAN DATA OTOMATIS ---
     instruksi_rekaman = ""
-    naskah_ssml = ""
+    teks_bawaan = ""
     
     # Cek apakah ada data dari Ruang 1 (naskah.py)
     if "hasil_naskah" in st.session_state and st.session_state.hasil_naskah:
@@ -39,17 +39,16 @@ def run():
         except:
             instruksi_rekaman = ""
 
-        # B. Ekstraksi Naskah SSML (Mencari teks di dalam blok kode ```)
-        # Menggunakan regex yang aman agar tidak memutus tampilan editor
+        # B. Ekstraksi Naskah Final (Mencari teks di dalam blok kode ```)
         bt = "```" 
-        pattern = rf"{bt}(?:text|markdown|xml)?\n(.*?){bt}"
+        pattern = rf"{bt}(?:text|markdown)?\n(.*?){bt}"
         match_naskah = re.search(pattern, raw_text, re.DOTALL | re.IGNORECASE)
         
         if match_naskah:
-            naskah_ssml = match_naskah.group(1).strip()
-            st.success("✅ Naskah SSML berhasil ditarik otomatis dari Ruang 1!")
+            teks_bawaan = match_naskah.group(1).strip()
+            st.success("✅ Naskah final berhasil ditarik otomatis dari Ruang 1!")
         else:
-            naskah_ssml = raw_text
+            teks_bawaan = raw_text
             st.info("💡 Naskah ditarik tanpa filter blok kode. Silakan periksa formatnya.")
     else:
         st.info("💡 Belum ada naskah dari Ruang 1. Silakan buat naskah dulu atau ketik manual di bawah.")
@@ -59,12 +58,12 @@ def run():
         with st.expander("📖 Lihat Panduan Suara (Tone & Karakter)", expanded=True):
             st.markdown(instruksi_rekaman)
 
-    # Kotak Teks Utama (Mendukung Input SSML)
+    # Kotak Teks Utama (Murni Teks Polos)
     user_input = st.text_area(
-        "Kotak Kerja Naskah (Format SSML):", 
-        value=naskah_ssml, 
+        "Kotak Kerja Naskah:", 
+        value=teks_bawaan, 
         height=350,
-        help="Naskah dengan tag <speak> akan diproses secara natural."
+        help="Pastikan naskah bersih dari tanda kurung instruksi agar tidak ikut dibaca oleh AI."
     )
 
     # Panel Kontrol Mesin
@@ -82,17 +81,17 @@ def run():
     # --- 4. PROSES PRODUKSI AUDIO ---
     if st.button("🔥 Produksi Suara Pro Sekarang", use_container_width=True):
         if user_input:
-            # Pastikan teks diawali <speak> jika ingin menggunakan SSML
-            final_text = user_input.strip()
-            if not final_text.startswith("<speak>"):
-                final_text = f"<speak>{final_text}</speak>"
-
             try:
-                with st.spinner("Mesin sedang menerjemahkan kode SSML menjadi suara..."):
+                with st.spinner("Mesin sedang meracik frekuensi suara..."):
                     client = texttospeech.TextToSpeechClient(credentials=tts_credentials)
                     
-                    # KRUSIAL: Menggunakan parameter 'ssml' agar tag jeda dipatuhi
-                    synthesis_input = texttospeech.SynthesisInput(ssml=final_text)
+                    # Pembersihan teks dari instruksi non-verbal agar tidak dibaca robot
+                    # Menghapus apapun di dalam kurung ( ) dan [ ] sebagai pengaman tambahan
+                    clean_text = re.sub(r'\[.*?\]', '', user_input)
+                    clean_text = re.sub(r'\(.*?\)', '', clean_text)
+                    
+                    # KRUSIAL: Kembali menggunakan parameter 'text' (bukan ssml)
+                    synthesis_input = texttospeech.SynthesisInput(text=clean_text.strip())
                     
                     # Mapping Suara
                     voice_map = {
@@ -119,10 +118,10 @@ def run():
                         audio_config=audio_config
                     )
 
-                    st.success("✅ Berhasil! Silakan dengarkan perbedaannya:")
+                    st.success("✅ Berhasil! Silakan dengarkan hasilnya:")
                     st.audio(response.audio_content, format="audio/mp3")
                     
             except Exception as e:
-                st.error(f"Gagal memproduksi suara. Periksa apakah format naskah SSML sudah benar. Detail: {e}")
+                st.error(f"Gagal memproduksi suara. Detail: {e}")
         else:
             st.warning("Silakan isi naskah terlebih dahulu.")
