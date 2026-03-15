@@ -30,7 +30,7 @@ if st.session_state.nama_pengguna == "":
 
 # --- HEADER & NAVIGASI HALAMAN UTAMA ---
 st.title("🎙️ Studio Alih Suara Pro")
-st.markdown(f"Halo, **{st.session_state.nama_pengguna}**! Pilih ruangan kerja Anda di bawah ini:")
+st.markdown(f"Halo, sobat **{st.session_state.nama_pengguna}**! Pilih ruangan kerja Anda di bawah ini:")
 
 # Membuat 3 tombol sejajar sebagai menu utama
 col1, col2, col3 = st.columns(3)
