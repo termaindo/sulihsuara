@@ -21,50 +21,77 @@ def run():
         st.stop()
 
     st.title("🎧 Ruang 2: Studio Rekaman Pro")
-    st.info("💡 **Informasi:** Studio ini memakai dukungan AI untuk membaca naskah yang dibuat di Ruang 1 dan menghasilkan suara yang natural. Silakan atur Laju Bicara dan Nada Suara untuk mendapat rekaman yang paling sesuai keinginan Anda.")
+    st.info("💡 **Informasi:** Studio ini memakai dukungan AI untuk membaca naskah yang dibuat di Ruang 1. Anda memiliki kendali penuh untuk mengedit naskah dan memodifikasi suara mesin di sini.")
     
-    # --- 2. LOGIKA PENARIKAN DATA OTOMATIS ---
+    # --- 2. LOGIKA PENARIKAN & PENYIMPANAN DATA OTOMATIS ---
+    # Memastikan variabel memori lokal tersedia untuk menyimpan hasil editan pengguna
+    if "naskah_vo" not in st.session_state:
+        st.session_state.naskah_vo = ""
+    if "last_raw_naskah" not in st.session_state:
+        st.session_state.last_raw_naskah = ""
+
     instruksi_rekaman = ""
-    teks_bawaan = ""
     
-    # Cek apakah ada data dari Ruang 1 (naskah.py)
-    if "hasil_naskah" in st.session_state and st.session_state.hasil_naskah:
-        raw_text = st.session_state.hasil_naskah
-        
+    # Cek apakah ada data mentah dari Ruang 1 (naskah.py)
+    raw_text = st.session_state.get("hasil_naskah", "")
+    if raw_text:
         # A. Ekstraksi Arahan Rekaman (Mencari teks antara 🎛️ dan 🎙️)
         try:
             search_arahan = re.search(r"🎛️ Arahan Rekaman:(.*?)🎙️", raw_text, re.DOTALL | re.IGNORECASE)
             if search_arahan:
                 instruksi_rekaman = search_arahan.group(1).strip()
         except:
-            instruksi_rekaman = ""
+            pass
 
-        # B. Ekstraksi Naskah Final (Mencari teks di dalam blok kode ```)
-        bt = "```" 
-        pattern = rf"{bt}(?:text|markdown)?\n(.*?){bt}"
-        match_naskah = re.search(pattern, raw_text, re.DOTALL | re.IGNORECASE)
-        
-        if match_naskah:
-            teks_bawaan = match_naskah.group(1).strip()
-            st.success("✅ Naskah final berhasil ditarik otomatis dari Ruang 1!")
-        else:
-            teks_bawaan = raw_text
-            st.info("💡 Naskah ditarik tanpa filter blok kode. Silakan periksa formatnya.")
+        # B. Deteksi apakah ini naskah BARU dari Ruang 1
+        if raw_text != st.session_state.last_raw_naskah:
+            st.session_state.last_raw_naskah = raw_text # Catat naskah mentah terbaru
+            
+            # Ekstraksi Naskah Final di dalam blok kode ```
+            bt = "```" 
+            pattern = rf"{bt}(?:text|markdown)?\n(.*?){bt}"
+            match_naskah = re.search(pattern, raw_text, re.DOTALL | re.IGNORECASE)
+            
+            if match_naskah:
+                # Timpa naskah di Studio dengan yang baru ditarik
+                st.session_state.naskah_vo = match_naskah.group(1).strip()
+                st.success("✅ Naskah baru berhasil ditarik otomatis dari Ruang 1!")
+            else:
+                st.session_state.naskah_vo = raw_text
+                st.info("💡 Naskah ditarik tanpa filter blok kode.")
     else:
-        st.info("💡 Belum ada naskah dari Ruang 1. Silakan buat naskah dulu atau ketik manual di bawah.")
+        if not st.session_state.naskah_vo:
+            st.info("💡 Belum ada naskah dari Ruang 1. Silakan buat naskah dulu atau ketik manual di bawah.")
 
-    # --- 3. TAMPILAN ARAHAN & KOTAK KERJA ---
+    # --- 3. TAMPILAN ARAHAN, PANDUAN TEKNIS & KOTAK KERJA ---
     if instruksi_rekaman:
-        with st.expander("📖 Lihat Panduan Suara (Tone & Karakter)", expanded=True):
+        with st.expander("📖 Lihat Panduan Suara dari Direktur Kreatif", expanded=True):
             st.markdown(instruksi_rekaman)
 
-    # Kotak Teks Utama (Murni Teks Polos)
+    # Contekan Teknis untuk mengarahkan pengguna awam
+    with st.expander("💡 CONTEKAN: Cara Mengatur Mesin agar Lebih Natural", expanded=True):
+        st.markdown("""
+        Jika Anda bingung bagaimana menerapkan arahan di atas ke dalam pengaturan mesin, gunakan rumus ini:
+        
+        * 🔥 **Energetik / Promo:** Nada (Pitch) **+1.0 s/d +3.0** | Laju (Speed) **1.1 s/d 1.2**
+        * 👔 **Berwibawa / Serius:** Nada (Pitch) **-2.0 s/d -4.0** | Laju (Speed) **0.8 s/d 0.9**
+        * ☕ **Ramah / Santai:** Nada (Pitch) **+0.5 s/d +1.5** | Laju (Speed) **0.9 s/d 1.1**
+        
+        **Trik Mengatur Napas AI (Edit langsung di kotak bawah!):**
+        * Jika mesin bicara terlalu kaku/terpotong: **HAPUS tanda koma (,)** di area tersebut.
+        * Jika mesin bicara terlalu cepat tanpa jeda: **TAMBAHKAN tanda koma (,)** atau ganti menjadi titik (.) untuk napas yang lebih panjang.
+        """)
+
+    # Kotak Teks Utama (Bisa diketik dan diedit langsung oleh pengguna)
     user_input = st.text_area(
-        "Kotak Kerja Naskah:", 
-        value=teks_bawaan, 
+        "📝 Kotak Kerja Naskah (Anda BEBAS mengetik, menghapus, atau mengubah tanda baca di sini):", 
+        value=st.session_state.naskah_vo, 
         height=350,
-        help="Pastikan naskah bersih dari tanda kurung instruksi agar tidak ikut dibaca oleh AI."
+        help="Semua perubahan yang Anda ketik di sini akan disimpan otomatis saat Anda menekan tombol produksi."
     )
+    
+    # Simpan hasil editan pengguna kembali ke session_state agar tidak hilang
+    st.session_state.naskah_vo = user_input
 
     # Panel Kontrol Mesin
     col1, col2, col3 = st.columns(3)
@@ -85,12 +112,10 @@ def run():
                 with st.spinner("Mesin sedang meracik frekuensi suara..."):
                     client = texttospeech.TextToSpeechClient(credentials=tts_credentials)
                     
-                    # Pembersihan teks dari instruksi non-verbal agar tidak dibaca robot
-                    # Menghapus apapun di dalam kurung ( ) dan [ ] sebagai pengaman tambahan
+                    # Pembersihan teks dari instruksi non-verbal (berjaga-jaga jika pengguna mengetiknya)
                     clean_text = re.sub(r'\[.*?\]', '', user_input)
                     clean_text = re.sub(r'\(.*?\)', '', clean_text)
                     
-                    # KRUSIAL: Kembali menggunakan parameter 'text' (bukan ssml)
                     synthesis_input = texttospeech.SynthesisInput(text=clean_text.strip())
                     
                     # Mapping Suara
