@@ -7,7 +7,7 @@ import calendar
 
 # --- KONFIGURASI KUOTA ---
 FILE_KUOTA = "pemakaian_tts.json"
-BATAS_MAKSIMAL = 1000000  # 1 Juta karakter
+BATAS_MAKSIMAL = 995000  # 1 Juta karakter - 5.000 untuk batas aman
 BATAS_WARNING = 990000    # Peringatan di 990 Ribu karakter
 
 # Fungsi untuk menghitung sisa hari dalam bulan ini
