@@ -1,11 +1,52 @@
 import streamlit as st
 import re
+import os
+import json
+from datetime import datetime
+import calendar
+
+# --- KONFIGURASI KUOTA ---
+FILE_KUOTA = "pemakaian_tts.json"
+BATAS_MAKSIMAL = 1000000  # 1 Juta karakter
+BATAS_WARNING = 990000    # Peringatan di 990 Ribu karakter
+
+# Fungsi untuk menghitung sisa hari dalam bulan ini
+def hitung_sisa_hari():
+    sekarang = datetime.now()
+    hari_terakhir = calendar.monthrange(sekarang.year, sekarang.month)[1]
+    return hari_terakhir - sekarang.day + 1 # +1 agar hari H dihitung
+
+# Fungsi untuk membaca dan mencatat pemakaian
+def catat_pemakaian(tambahan_karakter=0):
+    bulan_ini = datetime.now().strftime("%Y-%m")
+    
+    # Membaca file memori di drive
+    if os.path.exists(FILE_KUOTA):
+        try:
+            with open(FILE_KUOTA, "r") as f:
+                data = json.load(f)
+        except:
+            data = {"bulan": bulan_ini, "jumlah": 0}
+    else:
+        data = {"bulan": bulan_ini, "jumlah": 0}
+        
+    # Otomatis Reset jika berganti bulan!
+    if data.get("bulan") != bulan_ini:
+        data = {"bulan": bulan_ini, "jumlah": 0}
+        
+    # Menambahkan pemakaian baru
+    data["jumlah"] += tambahan_karakter
+    
+    # Menyimpan kembali ke file drive
+    with open(FILE_KUOTA, "w") as f:
+        json.dump(data, f)
+        
+    return data["jumlah"]
 
 def run():
     # Import dilakukan di dalam fungsi agar isolasi modul tetap terjaga
     from google.cloud import texttospeech
     from google.oauth2 import service_account
-    import json
 
     # --- 1. SETUP KREDENSIAL GOOGLE CLOUD TTS ---
     try:
@@ -21,7 +62,6 @@ def run():
         st.stop()
 
     # --- INJEKSI CSS UNTUK MENYEMBUNYIKAN "Press Ctrl+Enter" ---
-    # Ini akan membuat tampilan lebih bersih, terutama untuk pengguna HP
     st.markdown("""
         <style>
             div[data-testid="InputInstructions"] {
@@ -31,6 +71,18 @@ def run():
     """, unsafe_allow_html=True)
 
     st.title("🎧 Ruang 2: Studio Rekaman Pro")
+    
+    # --- SISTEM PANTAU KUOTA (TAMPILAN UI) ---
+    pemakaian_saat_ini = catat_pemakaian(0) # Hanya membaca, belum menambah
+    persentase = min(pemakaian_saat_ini / BATAS_MAKSIMAL, 1.0)
+    
+    st.caption(f"📊 **Pemakaian Kuota Gratis Bulan Ini:** {pemakaian_saat_ini:,} / 995.000 karakter")
+    st.progress(persentase)
+    
+    if pemakaian_saat_ini >= BATAS_WARNING:
+        sisa_hari = hitung_sisa_hari()
+        st.warning(f"⚠️ **PERHATIAN: KUOTA HAMPIR HABIS!**\nAnda telah menggunakan {pemakaian_saat_ini:,} karakter. Harap berhemat. Kuota Google TTS Anda akan otomatis di-reset menjadi nol (0) dalam **{sisa_hari} hari** lagi.")
+
     st.info("💡 **Informasi:** Studio ini memakai dukungan AI untuk membaca naskah yang dibuat di Ruang 1. Anda memiliki kendali penuh untuk mengedit naskah dan memodifikasi suara mesin di sini.")
     
     # --- 2. LOGIKA PENARIKAN & PENYIMPANAN DATA OTOMATIS ---
@@ -74,7 +126,7 @@ def run():
         with st.expander("📖 Lihat Panduan Suara dari Direktur Kreatif", expanded=True):
             st.markdown(instruksi_rekaman)
 
-    # Contekan Teknis (Diperbarui Urutannya: Laju lalu Nada)
+    # Contekan Teknis
     with st.expander("💡 CONTEKAN: Cara Mengatur Mesin agar Lebih Natural", expanded=True):
         st.markdown("""
         Jika Anda bingung bagaimana menerapkan arahan di atas ke dalam pengaturan mesin, gunakan rumus ini:
@@ -88,7 +140,7 @@ def run():
         * Jika mesin bicara terlalu cepat tanpa jeda: **TAMBAHKAN tanda koma (,)** atau ganti menjadi titik (.) untuk napas yang lebih panjang.
         """)
 
-    # Kotak Teks Utama (Tanpa tulisan Ctrl+Enter yang mengganggu)
+    # Kotak Teks Utama
     st.markdown("**📱 PENGGUNA HP:** Silakan ketuk area teks di bawah ini untuk mengedit. Jika sudah selesai, langsung saja klik tombol **Produksi Suara** di bagian bawah.")
     user_input = st.text_area(
         "📝 Kotak Kerja Naskah (Anda BEBAS mengetik, menghapus, atau mengubah tanda baca di sini):", 
@@ -102,7 +154,6 @@ def run():
     # Panel Kontrol Mesin
     col1, col2, col3 = st.columns(3)
     with col1:
-        # Urutan sudah dirapikan: Wanita A, Wanita B, Pria C, Pria D
         voice_opt = st.selectbox(
             "Pilih Karakter Suara:", 
             [
@@ -120,22 +171,30 @@ def run():
     # --- 4. PROSES PRODUKSI AUDIO ---
     if st.button("🔥 Produksi Suara Pro Sekarang", use_container_width=True):
         if user_input:
+            
+            clean_text = re.sub(r'\[.*?\]', '', user_input)
+            clean_text = re.sub(r'\(.*?\)', '', clean_text)
+            naskah_final = clean_text.strip()
+            panjang_teks = len(naskah_final)
+            
+            # CEK SISA KUOTA SEBELUM PROSES
+            sisa_kuota = BATAS_MAKSIMAL - pemakaian_saat_ini
+            if panjang_teks > sisa_kuota:
+                st.error(f"❌ **GAGAL:** Naskah ini membutuhkan {panjang_teks:,} karakter, sedangkan sisa kuota Anda hanya {sisa_kuota:,} karakter. Mohon tunggu {hitung_sisa_hari()} hari lagi hingga awal bulan depan.")
+                return # Hentikan proses!
+                
             try:
                 with st.spinner("Mesin sedang meracik frekuensi suara..."):
                     client = texttospeech.TextToSpeechClient(credentials=tts_credentials)
                     
-                    clean_text = re.sub(r'\[.*?\]', '', user_input)
-                    clean_text = re.sub(r'\(.*?\)', '', clean_text)
+                    synthesis_input = texttospeech.SynthesisInput(text=naskah_final)
                     
-                    synthesis_input = texttospeech.SynthesisInput(text=clean_text.strip())
-                    
-                    # Pemetaan Suara Khusus (Menyelaraskan Label UI dengan Kode Asli Google)
-                    # Di Google: A & D = Wanita, B & C = Pria
+                    # Pemetaan Suara Khusus 
                     voice_map = {
-                        "Wanita (Wavenet-A)": "id-ID-Wavenet-A", # Google Wanita 1
-                        "Wanita (Wavenet-B)": "id-ID-Wavenet-D", # Google Wanita 2 (D)
-                        "Pria (Wavenet-C)": "id-ID-Wavenet-B",   # Google Pria 1 (B)
-                        "Pria (Wavenet-D)": "id-ID-Wavenet-C"    # Google Pria 2 (C)
+                        "Wanita (Wavenet-A)": "id-ID-Wavenet-A", 
+                        "Wanita (Wavenet-B)": "id-ID-Wavenet-D", 
+                        "Pria (Wavenet-C)": "id-ID-Wavenet-B",   
+                        "Pria (Wavenet-D)": "id-ID-Wavenet-C"    
                     }
                     
                     voice = texttospeech.VoiceSelectionParams(
@@ -155,6 +214,9 @@ def run():
                         audio_config=audio_config
                     )
 
+                    # Jika sukses memproduksi, catat jumlah karakternya ke file drive
+                    catat_pemakaian(panjang_teks)
+
                     st.success("✅ Berhasil! Silakan dengarkan hasilnya:")
                     st.audio(response.audio_content, format="audio/mp3")
                     
@@ -165,7 +227,7 @@ def run():
                         file_name="hasil_rekaman_studio.mp3",
                         mime="audio/mp3",
                         use_container_width=True,
-                        type="primary" # Membuat tombol lebih mencolok
+                        type="primary"
                     )
                     
             except Exception as e:
