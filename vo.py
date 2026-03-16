@@ -4,10 +4,11 @@ import os
 import json
 from datetime import datetime
 import calendar
+import io # Modul tambahan untuk Google Drive
 
 # --- KONFIGURASI KUOTA ---
 FILE_KUOTA = "pemakaian_tts.json"
-BATAS_MAKSIMAL = 995000  # 1 Juta karakter - 5.000 untuk batas aman
+BATAS_MAKSIMAL = 995000  # 1 Juta karakter, dengan batas aman 995 ribu
 BATAS_WARNING = 990000    # Peringatan di 990 Ribu karakter
 
 # Fungsi untuk menghitung sisa hari dalam bulan ini
@@ -16,39 +17,16 @@ def hitung_sisa_hari():
     hari_terakhir = calendar.monthrange(sekarang.year, sekarang.month)[1]
     return hari_terakhir - sekarang.day + 1 # +1 agar hari H dihitung
 
-# Fungsi untuk membaca dan mencatat pemakaian
-def catat_pemakaian(tambahan_karakter=0):
-    bulan_ini = datetime.now().strftime("%Y-%m")
-    
-    # Membaca file memori di drive
-    if os.path.exists(FILE_KUOTA):
-        try:
-            with open(FILE_KUOTA, "r") as f:
-                data = json.load(f)
-        except:
-            data = {"bulan": bulan_ini, "jumlah": 0}
-    else:
-        data = {"bulan": bulan_ini, "jumlah": 0}
-        
-    # Otomatis Reset jika berganti bulan!
-    if data.get("bulan") != bulan_ini:
-        data = {"bulan": bulan_ini, "jumlah": 0}
-        
-    # Menambahkan pemakaian baru
-    data["jumlah"] += tambahan_karakter
-    
-    # Menyimpan kembali ke file drive
-    with open(FILE_KUOTA, "w") as f:
-        json.dump(data, f)
-        
-    return data["jumlah"]
-
 def run():
     # Import dilakukan di dalam fungsi agar isolasi modul tetap terjaga
     from google.cloud import texttospeech
     from google.oauth2 import service_account
+    
+    # Import khusus untuk Google Drive
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
-    # --- 1. SETUP KREDENSIAL GOOGLE CLOUD TTS ---
+    # --- 1. SETUP KREDENSIAL GOOGLE CLOUD & DRIVE ---
     try:
         gcp_creds = st.secrets["GCP_CREDENTIALS"]
         if isinstance(gcp_creds, str):
@@ -57,6 +35,22 @@ def run():
             gcp_creds_dict = dict(gcp_creds)
             
         tts_credentials = service_account.Credentials.from_service_account_info(gcp_creds_dict)
+        
+        # Otorisasi Khusus ke Google Drive
+        SCOPES = ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.metadata.readonly']
+        drive_creds = service_account.Credentials.from_service_account_info(gcp_creds_dict, scopes=SCOPES)
+        drive_service = build('drive', 'v3', credentials=drive_creds)
+        
+        folder_id = st.secrets["DRIVE_FOLDER_ID"]
+        
+    except KeyError as e:
+        if "DRIVE_FOLDER_ID" in str(e):
+            st.error("🚨 Kunci 'DRIVE_FOLDER_ID' belum ditambahkan di st.secrets!")
+            st.info("Sistem dihentikan. Silakan ikuti panduan menghubungkan Google Drive terlebih dahulu.")
+            st.stop()
+        else:
+            st.error(f"Kredensial bermasalah: {e}")
+            st.stop()
     except Exception as e:
         st.error(f"Kredensial Google Cloud bermasalah: {e}")
         st.stop()
@@ -72,11 +66,69 @@ def run():
 
     st.title("🎧 Ruang 2: Studio Rekaman Pro")
     
+    # --- FUNGSI SINKRONISASI DRIVE (Disembunyikan di dalam agar aman) ---
+    def sinkronisasi_drive(tambahan_karakter=0):
+        bulan_ini = datetime.now().strftime("%Y-%m")
+        
+        # 1. Cari file di folder Google Drive Bapak
+        query = f"name='{FILE_KUOTA}' and '{folder_id}' in parents and trashed=false"
+        results = drive_service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
+        items = results.get('files', [])
+        
+        data = {"bulan": bulan_ini, "jumlah": 0}
+        file_id = None
+        
+        # 2. Jika file ditemukan, unduh dan baca isinya
+        if items:
+            file_id = items[0]['id']
+            request = drive_service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+            fh.seek(0)
+            try:
+                isi_file = fh.read().decode('utf-8')
+                data = json.loads(isi_file)
+            except:
+                pass
+                
+        # 3. Otomatis reset kuota jika berganti bulan
+        if data.get("bulan") != bulan_ini:
+            data = {"bulan": bulan_ini, "jumlah": 0}
+            
+        # 4. Tambahkan pemakaian baru
+        data["jumlah"] += tambahan_karakter
+        
+        # 5. Upload kembali ke Google Drive jika ada perubahan
+        if tambahan_karakter > 0 or not items:
+            file_metadata = {'name': FILE_KUOTA, 'parents': [folder_id]}
+            fh_upload = io.BytesIO(json.dumps(data).encode('utf-8'))
+            media = MediaIoBaseUpload(fh_upload, mimetype='application/json', resumable=True)
+            
+            if file_id:
+                drive_service.files().update(fileId=file_id, media_body=media).execute()
+            else:
+                drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+                
+        return data["jumlah"]
+
     # --- SISTEM PANTAU KUOTA (TAMPILAN UI) ---
-    pemakaian_saat_ini = catat_pemakaian(0) # Hanya membaca, belum menambah
+    # Memori st.session_state digunakan agar tidak loading ke Drive berkali-kali (hemat kinerja)
+    if "kuota_terpakai" not in st.session_state:
+        with st.spinner("🔄 Menghubungkan ke Google Drive Anda untuk mengecek kuota..."):
+            try:
+                st.session_state.kuota_terpakai = sinkronisasi_drive(0)
+            except Exception as e:
+                st.error(f"Gagal membaca Google Drive: {e}")
+                st.info("Pastikan Google Drive API aktif dan Folder sudah dibagikan (Share) ke email Service Account.")
+                st.stop()
+
+    pemakaian_saat_ini = st.session_state.kuota_terpakai
     persentase = min(pemakaian_saat_ini / BATAS_MAKSIMAL, 1.0)
     
-    st.caption(f"📊 **Pemakaian Kuota Gratis Bulan Ini:** {pemakaian_saat_ini:,} / 995.000 karakter")
+    st.caption(f"📊 **Pemakaian Kuota Gratis Bulan Ini (Tersinkron di Google Drive):** {pemakaian_saat_ini:,} / 995.000 karakter")
     st.progress(persentase)
     
     if pemakaian_saat_ini >= BATAS_WARNING:
@@ -95,7 +147,6 @@ def run():
     
     raw_text = st.session_state.get("hasil_naskah", "")
     if raw_text:
-        # A. Ekstraksi Arahan Rekaman
         try:
             search_arahan = re.search(r"🎛️ Arahan Rekaman:(.*?)🎙️", raw_text, re.DOTALL | re.IGNORECASE)
             if search_arahan:
@@ -103,7 +154,6 @@ def run():
         except:
             pass
 
-        # B. Deteksi apakah ini naskah BARU
         if raw_text != st.session_state.last_raw_naskah:
             st.session_state.last_raw_naskah = raw_text 
             
@@ -126,7 +176,6 @@ def run():
         with st.expander("📖 Lihat Panduan Suara dari Direktur Kreatif", expanded=True):
             st.markdown(instruksi_rekaman)
 
-    # Contekan Teknis
     with st.expander("💡 CONTEKAN: Cara Mengatur Mesin agar Lebih Natural", expanded=True):
         st.markdown("""
         Jika Anda bingung bagaimana menerapkan arahan di atas ke dalam pengaturan mesin, gunakan rumus ini:
@@ -140,7 +189,6 @@ def run():
         * Jika mesin bicara terlalu cepat tanpa jeda: **TAMBAHKAN tanda koma (,)** atau ganti menjadi titik (.) untuk napas yang lebih panjang.
         """)
 
-    # Kotak Teks Utama
     st.markdown("**📱 PENGGUNA HP:** Silakan ketuk area teks di bawah ini untuk mengedit. Jika sudah selesai, langsung saja klik tombol **Produksi Suara** di bagian bawah.")
     user_input = st.text_area(
         "📝 Kotak Kerja Naskah (Anda BEBAS mengetik, menghapus, atau mengubah tanda baca di sini):", 
@@ -151,7 +199,6 @@ def run():
     
     st.session_state.naskah_vo = user_input
 
-    # Panel Kontrol Mesin
     col1, col2, col3 = st.columns(3)
     with col1:
         voice_opt = st.selectbox(
@@ -181,7 +228,7 @@ def run():
             sisa_kuota = BATAS_MAKSIMAL - pemakaian_saat_ini
             if panjang_teks > sisa_kuota:
                 st.error(f"❌ **GAGAL:** Naskah ini membutuhkan {panjang_teks:,} karakter, sedangkan sisa kuota Anda hanya {sisa_kuota:,} karakter. Mohon tunggu {hitung_sisa_hari()} hari lagi hingga awal bulan depan.")
-                return # Hentikan proses!
+                st.stop()
                 
             try:
                 with st.spinner("Mesin sedang meracik frekuensi suara..."):
@@ -189,7 +236,6 @@ def run():
                     
                     synthesis_input = texttospeech.SynthesisInput(text=naskah_final)
                     
-                    # Pemetaan Suara Khusus 
                     voice_map = {
                         "Wanita (Wavenet-A)": "id-ID-Wavenet-A", 
                         "Wanita (Wavenet-B)": "id-ID-Wavenet-D", 
@@ -214,13 +260,16 @@ def run():
                         audio_config=audio_config
                     )
 
-                    # Jika sukses memproduksi, catat jumlah karakternya ke file drive
-                    catat_pemakaian(panjang_teks)
+                    # UPDATE KUOTA KE GOOGLE DRIVE
+                    try:
+                        kuota_baru = sinkronisasi_drive(panjang_teks)
+                        st.session_state.kuota_terpakai = kuota_baru
+                    except Exception as e:
+                        st.warning(f"⚠️ Audio berhasil dibuat, namun gagal menyimpan catatan kuota ke Google Drive: {e}")
 
                     st.success("✅ Berhasil! Silakan dengarkan hasilnya:")
                     st.audio(response.audio_content, format="audio/mp3")
                     
-                    # --- TOMBOL DOWNLOAD EKSPLISIT ---
                     st.download_button(
                         label="⬇️ Download Hasil Audio (MP3)",
                         data=response.audio_content,
