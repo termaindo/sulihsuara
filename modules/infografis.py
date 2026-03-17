@@ -1,133 +1,61 @@
 import streamlit as st
-import re
-import google.generativeai as genai
-import os
 
-def run():
-    # --- 1. KARANTINA MEMORI SISTEM & SETUP GEMINI ---
-    os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
-    try:
-        gemini_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=gemini_key)
-    except Exception as e:
-        st.error(f"Kredensial Gemini bermasalah: {e}")
-        st.stop()
+# Mengimpor modul dari dalam folder 'modules'
+from modules import naskah
+from modules import vo
+from modules import infografis
 
-    st.title("🎨 Ruang 3: Studio Cetak (Visual & Infografis)")
-    st.info("💡 **Informasi:** Studio ini memakai bantuan AI untuk memecah naskah Anda menjadi lembar kerja visual (*blueprint* desain). Ini akan memudahkan Anda menyalin-tempel (*copy-paste*) teks ke aplikasi desain seperti Canva, Photoshop, atau Illustrator.")
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="Studio Alih Suara Pro", page_icon="🎙️", layout="wide")
 
-    # Inisialisasi State untuk Hasil Blueprint
-    if "blueprint_infografis" not in st.session_state:
-        st.session_state.blueprint_infografis = ""
+# --- INISIALISASI STATE ---
+if 'nama_pengguna' not in st.session_state:
+    st.session_state.nama_pengguna = ""
+if 'menu_aktif' not in st.session_state:
+    st.session_state.menu_aktif = "Home"
 
-    # --- 2. TARIK NASKAH DARI STATE ---
-    raw_text = st.session_state.get("hasil_naskah", "")
+# --- HALAMAN PENYAPAAN (LOGIN NAMA) ---
+if st.session_state.nama_pengguna == "":
+    st.title("🎙️ Selamat Datang di Studio Alih Suara Pro")
+    st.markdown("Sebelum kita mulai memproduksi naskah dan rekaman yang memukau, bolehkah saya tahu dengan siapa saya berinteraksi?")
     
-    if not raw_text:
-        st.warning("Belum ada naskah yang ditarik. Silakan buat naskah terlebih dahulu di Ruang 1 (Rapat Naskah).")
-        return
-
-    # --- 3. EKSTRAKSI TEKS DARI KOTAK MARKDOWN ---
-    naskah_final = raw_text
-    bt = "```" 
-    pattern = rf"{bt}(?:text|markdown|xml)?\n(.*?)({bt})"
-    match_naskah = re.search(pattern, raw_text, re.DOTALL | re.IGNORECASE)
-    
-    if match_naskah:
-        naskah_final = match_naskah.group(1).strip()
-        st.success("✅ Naskah dasar berhasil ditarik dari Ruang 1!")
-    else:
-        st.info("💡 Naskah ditarik tanpa filter blok kode.")
-
-    # --- 4. FILTER DROPDOWN PENGATURAN DESAIN ---
-    st.markdown("### 🎛️ Pengaturan Format Desain")
-    col1, col2 = st.columns(2)
-    with col1:
-        opsi_slide = st.selectbox(
-            "1. Jumlah Slide / Tampilan:", 
-            [
-                "Pilih...",
-                "Otomatis (Sesuai panjang teks)",
-                "1 Halaman Penuh (Poster/Infografis Panjang)",
-                "3 Slide (Carousel Singkat)",
-                "5 Slide (Carousel Standar)",
-                "7 Slide (Carousel Edukasi)",
-                "10 Slide (Carousel Maksimal Instagram)"
-            ]
-        )
-    with col2:
-        opsi_dimensi = st.selectbox(
-            "2. Ukuran Dimensi:", 
-            [
-                "Pilih...",
-                "1080 x 1080 px (Square / IG Feed)",
-                "1080 x 1350 px (Portrait / IG Feed)",
-                "1080 x 1920 px (Vertical / IG Story / TikTok)",
-                "1920 x 1080 px (Landscape / Presentasi PPT / YouTube)"
-            ]
-        )
-
-    st.divider()
-
-    # --- 5. RANGKUMAN POIN PENTING (KOTAK KERJA) ---
-    st.markdown("### 📝 Rangkuman Poin Penting (Draft)")
-    st.write("Berikut adalah naskah mentah Anda. Anda bisa mengedit atau menambahkan catatan khusus di sini sebelum AI mengubahnya menjadi format *slide*.")
-    
-    user_input = st.text_area(
-        "Kotak Kerja Draft Naskah:", 
-        value=naskah_final, 
-        height=200,
-        help="Edit poin-poin penting di sini sebelum menekan tombol pembuatan."
-    )
-
-    # --- 6. PROSES PEMBUATAN INFOGRAFIS OLEH AI ---
-    if st.button("✨ Buat Blueprint Infografis Sekarang", use_container_width=True, type="primary"):
-        if opsi_slide == "Pilih..." or opsi_dimensi == "Pilih...":
-            st.warning("⚠️ Mohon pilih jumlah slide dan ukuran dimensi terlebih dahulu!")
-        elif not user_input.strip():
-            st.warning("⚠️ Draft naskah tidak boleh kosong!")
-        else:
-            with st.spinner("Desainer AI sedang memecah teks dan menyusun tata letak (layout)..."):
-                try:
-                    # Instruksi khusus untuk AI Desainer
-                    PROMPT_DESAINER = f"""
-                    Kamu adalah Ahli Desain Visual dan Copywriter Media Sosial profesional.
-                    Tugasmu adalah mengubah teks/draft mentah menjadi blueprint (panduan desain) yang siap di-copy-paste ke Canva/Photoshop.
-
-                    PANDUAN STRUKTUR DESAIN:
-                    - Target Jumlah Slide: {opsi_slide}
-                    - Dimensi Desain: {opsi_dimensi}
-                    
-                    ATURAN MUTLAK FORMAT OUTPUT:
-                    1. Pecah teks mentah ke dalam beberapa bagian yang jelas (Slide 1, Slide 2, dst).
-                    2. Sesuaikan kepadatan teks! Jika dimensi "Square" (1080x1080), teks harus sedikit dan font besar. Jika dimensi "Vertical" atau "1 Halaman", teks bisa lebih banyak berderet ke bawah.
-                    3. Untuk setiap Slide/Halaman, WAJIB memiliki format baku seperti ini:
-                       
-                       ### 🖼️ Slide [Nomor]
-                       **Judul Besar:** [Headline singkat yang memancing mata]
-                       **Teks Utama:** [Isi konten berupa poin-poin/kalimat singkat]
-                       **Saran Visual:** [Saran singkat ikon, gambar latar, atau warna yang cocok]
-                       ---
-                       
-                    4. Pastikan teks sangat *to-the-point*, hapus kata-kata berbunga-bunga yang tidak cocok untuk format gambar visual. Tuliskan dalam bahasa Indonesia yang memikat.
-                    """
-
-                    model_desainer = genai.GenerativeModel(
-                        model_name="gemini-2.5-flash",
-                        system_instruction=PROMPT_DESAINER
-                    )
-                    
-                    response = model_desainer.generate_content(f"Draft Naskah:\n{user_input}")
-                    st.session_state.blueprint_infografis = response.text
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan saat menyusun infografis: {e}")
-
-    # --- 7. TAMPILAN HASIL AKHIR ---
-    if st.session_state.blueprint_infografis:
-        st.success("🎉 Blueprint Infografis berhasil dibuat!")
+    with st.form("form_nama"):
+        nama_input = st.text_input("Masukkan Nama Anda:", placeholder="Contoh: Bapak Rudi")
+        submit_nama = st.form_submit_button("Masuk ke Studio ➡️")
         
-        # Menampilkan dalam wadah dengan latar belakang yang jelas
-        with st.container(border=True):
-            st.markdown(st.session_state.blueprint_infografis)
-            
-        st.info("💡 **Tips:** Anda sekarang bisa memblok (highlight) teks di masing-masing slide di atas, lalu menyalinnya (Copy) ke dalam template presentasi atau desain media sosial Anda.")
+        if submit_nama:
+            if nama_input.strip() != "":
+                st.session_state.nama_pengguna = nama_input.strip()
+                st.rerun()
+            else:
+                st.warning("Mohon isi nama Anda terlebih dahulu untuk melanjutkan.")
+    st.stop() # Hentikan eksekusi kode di bawahnya sampai nama diisi
+
+# --- HEADER & NAVIGASI HALAMAN UTAMA ---
+st.title("🎙️ Studio Alih Suara Pro")
+st.markdown(f"Halo, sobat **{st.session_state.nama_pengguna}**! Pilih ruangan kerja Anda di bawah ini:")
+
+# Membuat 3 tombol sejajar sebagai menu utama
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("📝 Ruang 1: Rapat Naskah", use_container_width=True):
+        st.session_state.menu_aktif = "1. Ruang Naskah"
+with col2:
+    if st.button("🚀 Ruang 2: Studio Rekaman (VO)", use_container_width=True):
+        st.session_state.menu_aktif = "2. Studio Rekaman"
+with col3:
+    if st.button("🎨 Ruang 3: Studio Cetak (Visual)", use_container_width=True):
+        st.session_state.menu_aktif = "3. Studio Cetak"
+
+st.divider()
+
+# --- ROUTING MENU (PENGARAHAN KE MODUL) ---
+if st.session_state.menu_aktif == "1. Ruang Naskah":
+    naskah.run()
+elif st.session_state.menu_aktif == "2. Studio Rekaman":
+    vo.run()
+elif st.session_state.menu_aktif == "3. Studio Cetak":
+    infografis.run()
+else:
+    st.info("👈 Silakan pilih ruangan kerja di atas untuk memulai produksi Anda.")
