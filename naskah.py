@@ -291,6 +291,10 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         st.subheader("🎬 Hasil Naskah Pro")
 
         if not st.session_state.hasil_naskah:
+            # Memunculkan notifikasi jika pengguna memilih platform dengan limit karakter kecil
+            if "Threads" in st.session_state.jawaban['konteks']:
+                st.info("💡 **Info Batasan:** Karena Anda memilih platform Pesan Teks (termasuk Threads), sistem membatasi panjang naskah final maksimal **500 karakter** agar dapat diposting tanpa terpotong.")
+                
             with st.spinner("Direktur sedang menyusun naskah yang natural dan berjiwa..."):
                 try:
                     model_direktur = genai.GenerativeModel(
@@ -298,6 +302,11 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                         system_instruction=DIREKTUR_PROMPT
                     )
                     
+                    # Logika Hard Cap untuk Threads (500 Karakter)
+                    instruksi_tambahan_platform = ""
+                    if "Threads" in st.session_state.jawaban['konteks']:
+                        instruksi_tambahan_platform = "\n[ATURAN MUTLAK] Karena platform mencakup Threads, PANJANG NASKAH FINAL DI DALAM KOTAK KODE TIDAK BOLEH LEBIH DARI 500 KARAKTER (termasuk spasi)!"
+
                     # Menyusun prompt yang lebih rapi ke Gemini beserta info tujuan
                     prompt_final = f"""
                     Tolong buatkan naskah berdasarkan panduan berikut:
@@ -307,7 +316,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                     - Durasi Target: {st.session_state.jawaban['durasi']}
                     - Target Audiens/Pembaca: {st.session_state.jawaban['audiens']}
                     - Vibe/Emosi: {st.session_state.jawaban['vibe']}
-                    - Konteks Platform: {st.session_state.jawaban['konteks']}
+                    - Konteks Platform: {st.session_state.jawaban['konteks']} {instruksi_tambahan_platform}
                     - Catatan Tambahan: {st.session_state.jawaban['tambahan'] if st.session_state.jawaban['tambahan'] else "Tidak ada"}
                     """
                     
