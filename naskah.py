@@ -122,12 +122,13 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
     elif st.session_state.wizard_step == 3:
         st.subheader("Langkah 3 dari 6: Tujuan & Target Panjang/Durasi")
         
-        # Penambahan Tujuan Pembuatan Naskah
+        # Penambahan Tujuan Pembuatan Naskah (Termasuk Infografis)
         pilihan_tujuan = st.selectbox("Apa tujuan pembuatan naskah ini?", 
                                ["Pilih...", 
                                 "Copywriting / Naskah Iklan / Promosi", 
                                 "Naskah Rekaman Audio", 
-                                "Naskah Suara Penjelasan di Video", 
+                                "Naskah Suara Penjelasan di Video",
+                                "Teks Infografis / Presentasi Visual", 
                                 "Isi sendiri..."])
         
         jawaban_tujuan = pilihan_tujuan
@@ -141,7 +142,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_durasi = pilihan_durasi
         if pilihan_durasi == "Isi sendiri...":
-            jawaban_durasi = st.text_input("Masukkan target panjang naskah (misal: 45 detik atau 2 paragraf):")
+            jawaban_durasi = st.text_input("Masukkan target panjang naskah (misal: 45 detik, 2 paragraf, atau 5 slide):")
             
             # --- LOGIKA PEMBATASAN DURASI (HARD CAP 180 DETIK) ---
             if jawaban_durasi:
@@ -155,10 +156,12 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                         total_detik = nilai_angka * 3600
                     elif "menit" in teks_kecil:
                         total_detik = nilai_angka * 60
-                    else:
+                    elif "detik" in teks_kecil:
                         total_detik = nilai_angka
+                    else:
+                        total_detik = 0 # Abaikan jika isian berupa "5 slide" atau "2 paragraf"
                     
-                    # Penguncian jika melebihi batas
+                    # Penguncian jika melebihi batas (Hanya jika terdeteksi unsur waktu)
                     if total_detik > 180:
                         st.warning("⏳ **Perhatian:** Maksimal target durasi adalah **180 detik (3 menit)** untuk menjaga kualitas naskah. Isian Anda otomatis dikunci ke batas maksimal tersebut.")
                         jawaban_durasi = "180 detik (Batas maksimal)"
@@ -219,6 +222,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
     elif st.session_state.wizard_step == 5:
         st.subheader("Langkah 5 dari 6: Konteks & Koreksi")
         
+        # Penambahan Platform Infografis
         pilihan_konteks = st.selectbox("Naskah ini akan digunakan untuk platform apa?", 
                                ["Pilih...", 
                                 "Video Pendek (TikTok / Reels / Shorts)", 
@@ -226,6 +230,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                                 "Audio Presentasi / Komunitas", 
                                 "Pesan Teks (WhatsApp / Telegram / Threads)",
                                 "Caption Media Sosial (Instagram / Facebook / TikTok)",
+                                "Postingan Infografis (Feed / Carousel Instagram / LinkedIn)",
                                 "Isi sendiri..."])
         
         jawaban_konteks = pilihan_konteks
@@ -252,8 +257,10 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                     total_detik = nilai_angka * 3600
                 elif "menit" in teks_kecil:
                     total_detik = nilai_angka * 60
-                else:
+                elif "detik" in teks_kecil:
                     total_detik = nilai_angka
+                else:
+                    total_detik = 0
                 
                 if total_detik > 180:
                     st.warning("⏳ **Perhatian:** Maksimal target durasi adalah **180 detik (3 menit)**. Sistem akan menggunakan batas maksimal tersebut untuk naskah Anda.")
@@ -291,9 +298,11 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         st.subheader("🎬 Hasil Naskah Pro")
 
         if not st.session_state.hasil_naskah:
-            # Memunculkan notifikasi jika pengguna memilih platform dengan limit karakter kecil
+            # Memunculkan notifikasi bantuan berdasarkan platform khusus
             if "Threads" in st.session_state.jawaban['konteks']:
                 st.info("💡 **Info Batasan:** Karena Anda memilih platform Pesan Teks (termasuk Threads), sistem membatasi panjang naskah final maksimal **500 karakter** agar dapat diposting tanpa terpotong.")
+            elif "Infografis" in st.session_state.jawaban['tujuan'] or "Infografis" in st.session_state.jawaban['konteks']:
+                st.info("💡 **Info Format:** Karena Anda memilih pembuatan Infografis, AI akan secara otomatis memformat teks menjadi poin-poin padat (bullet points/slide) yang siap disalin ke desain Anda.")
                 
             with st.spinner("Direktur sedang menyusun naskah yang natural dan berjiwa..."):
                 try:
@@ -302,10 +311,12 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                         system_instruction=DIREKTUR_PROMPT
                     )
                     
-                    # Logika Hard Cap untuk Threads (500 Karakter)
+                    # Logika Hard Cap & Format Khusus
                     instruksi_tambahan_platform = ""
                     if "Threads" in st.session_state.jawaban['konteks']:
                         instruksi_tambahan_platform = "\n[ATURAN MUTLAK] Karena platform mencakup Threads, PANJANG NASKAH FINAL DI DALAM KOTAK KODE TIDAK BOLEH LEBIH DARI 500 KARAKTER (termasuk spasi)!"
+                    elif "Infografis" in st.session_state.jawaban['tujuan'] or "Infografis" in st.session_state.jawaban['konteks']:
+                        instruksi_tambahan_platform = "\n[ATURAN MUTLAK] Ini adalah teks untuk INFOGRAFIS/PRESENTASI VISUAL. Buat naskah yang sangat terstruktur, gunakan BULLET POINTS atau penomoran slide (Slide 1, Slide 2, dst). Gunakan kalimat yang SUPER PADAT, JELAS, dan HINDARI paragraf panjang naratif. Fokus pada data dan *punchline*."
 
                     # Menyusun prompt yang lebih rapi ke Gemini beserta info tujuan
                     prompt_final = f"""
