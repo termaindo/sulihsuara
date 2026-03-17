@@ -1,6 +1,9 @@
 import streamlit as st
-import naskah
-import vo
+
+# Mengimpor modul dari dalam folder 'modules'
+from modules import naskah
+from modules import vo
+from modules import infografis
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Studio Alih Suara Pro", page_icon="🎙️", layout="wide")
@@ -34,36 +37,25 @@ st.markdown(f"Halo, sobat **{st.session_state.nama_pengguna}**! Pilih ruangan ke
 
 # Membuat 3 tombol sejajar sebagai menu utama
 col1, col2, col3 = st.columns(3)
+
 with col1:
-    if st.button("🏠 Halaman Utama", use_container_width=True):
-        st.session_state.menu_aktif = "Home"
-        st.rerun()
-with col2:
-    if st.button("📝 Ruang Naskah", use_container_width=True):
+    if st.button("📝 Ruang 1: Rapat Naskah", use_container_width=True):
         st.session_state.menu_aktif = "1. Ruang Naskah"
-        st.rerun()
-with col3:
-    if st.button("🎧 Studio Rekaman", use_container_width=True):
+with col2:
+    if st.button("🚀 Ruang 2: Studio Rekaman (VO)", use_container_width=True):
         st.session_state.menu_aktif = "2. Studio Rekaman"
-        st.rerun()
+with col3:
+    if st.button("🎨 Ruang 3: Studio Cetak (Visual)", use_container_width=True):
+        st.session_state.menu_aktif = "3. Studio Cetak"
 
 st.divider()
 
-# --- ROUTER LOGIC ---
-if st.session_state.menu_aktif == "Home":
-    st.subheader(f"Selamat Datang di Lobi Studio, sobat {st.session_state.nama_pengguna}!")
-    st.write("Untuk memastikan sistem berjalan tanpa gangguan memori, aplikasi ini dibagi menjadi dua ruangan. Silakan pilih ruangan yang Anda perlukan:")
-    
-    st.info("""
-    **📝 1. Ruang Naskah (Direktur Kreatif Penyusun Naskah)**
-    Di sini Anda akan dibimbing selangkah demi selangkah menyusun naskah *Voice Over* (VO) yang berjiwa dan sesuai target audiens. Hasil akhirnya adalah naskah matang yang langsung siap disalin (di-copy).
-    
-    **🎧 2. Studio Rekaman (Direktur Kreatif Perekaman Suara)**
-    Jika Anda sudah memiliki teks naskah final yang siap baca, silakan bawa ke sini. Mesin AI Google Cloud akan mengubah tulisan Anda menjadi audio bersuara manusia yang natural.
-    """)
-
-elif st.session_state.menu_aktif == "1. Ruang Naskah":
+# --- ROUTING MENU (PENGARAHAN KE MODUL) ---
+if st.session_state.menu_aktif == "1. Ruang Naskah":
     naskah.run()
-
 elif st.session_state.menu_aktif == "2. Studio Rekaman":
     vo.run()
+elif st.session_state.menu_aktif == "3. Studio Cetak":
+    infografis.run()
+else:
+    st.info("👈 Silakan pilih ruangan kerja di atas untuk memulai produksi Anda.")
