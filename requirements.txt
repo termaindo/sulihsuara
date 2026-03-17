@@ -2,3 +2,4 @@ streamlit>=1.30.0
 google-generativeai>=0.5.2
 google-cloud-texttospeech
 google-api-python-client
+requests
