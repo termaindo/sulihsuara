@@ -147,7 +147,7 @@ def run():
                         f"Create a highly detailed image generation prompt in English for an infographic poster based on this text. Make it visually appealing, modern, clean, with appropriate colors and layout. Include dummy text elements. Limit to 1 paragraph. Text:\n{st.session_state.blueprint_infografis}"
                     ).text
 
-                    # 2. Panggil API Image Generation Google (URL telah diperbaiki tanpa elemen markdown)
+                    # 2. Panggil API Image Generation Google (URL telah dibersihkan secara total)
                     api_key = st.secrets["GEMINI_API_KEY"]
                     url = f"[https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=](https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=){api_key}"
                     headers = {'Content-Type': 'application/json'}
