@@ -100,18 +100,19 @@ def run():
                     - Target Jumlah Slide: {opsi_slide} (ATURAN MUTLAK: Kamu WAJIB mematuhi instruksi jumlah slide ini. Jika pengguna memilih "1 Halaman Penuh", kamu HANYA BOLEH merangkum semuanya ke dalam 1 Slide/Halaman saja).
                     - Dimensi Desain: {opsi_dimensi}
                     
-                    ATURAN MUTLAK FORMAT OUTPUT:
+                    ATURAN MUTLAK FORMAT OUTPUT (PENTING! BACA INI!):
                     1. Pecah teks mentah ke dalam bagian yang sesuai dengan target jumlah slide (Slide 1, Slide 2, dst).
-                    2. JANGAN menggunakan terlalu banyak cetak tebal (bold/markdown **). Gunakan huruf normal biasa untuk Teks Utama agar rapi saat disalin.
-                    3. Untuk setiap Slide/Halaman, WAJIB memiliki format baku seperti ini:
+                    2. DILARANG KERAS menggunakan format heading besar seperti `#`, `##`, atau `###` di dalam teks/konten slide! Semua teks harus berukuran normal.
+                    3. JANGAN menggunakan terlalu banyak cetak tebal (bold/markdown **). Gunakan huruf normal biasa untuk Teks Utama.
+                    4. Untuk setiap Slide/Halaman, WAJIB memiliki format baku seperti ini:
                        
                        ### 🖼️ Slide [Nomor]
                        **Judul Besar:** [Headline singkat yang memancing mata]
-                       **Teks Utama:** [Isi konten berupa paragraf singkat atau poin-poin dengan huruf normal (tanpa cetak tebal)]
-                       **Saran Visual:** [Saran singkat ikon, gambar latar, atau warna yang cocok]
+                       **Teks Utama:** [Isi konten berupa paragraf singkat atau poin-poin dengan huruf normal. JANGAN PAKAI HEADING '#' DI SINI!]
+                       **Saran Visual:** [Saran singkat ikon, gambar latar, atau warna yang cocok. JANGAN PAKAI HEADING '#' DI SINI!]
                        ---
                        
-                    4. Pastikan teks sangat *to-the-point*, hapus kata-kata berbunga-bunga yang tidak cocok untuk format gambar visual. Tuliskan dalam bahasa Indonesia yang memikat.
+                    5. Pastikan teks sangat *to-the-point*, hapus kata-kata berbunga-bunga yang tidak cocok untuk format gambar visual. Tuliskan dalam bahasa Indonesia yang memikat.
                     """
 
                     model_desainer = genai.GenerativeModel(
@@ -147,7 +148,7 @@ def run():
                         f"Create a highly detailed image generation prompt in English for an infographic poster based on this text. Make it visually appealing, modern, clean, with appropriate colors and layout. Include dummy text elements. Limit to 1 paragraph. Text:\n{st.session_state.blueprint_infografis}"
                     ).text
 
-                    # 2. Panggil API Image Generation Google (URL telah diperbaiki)
+                    # 2. Panggil API Image Generation Google (URL yang error telah diperbaiki)
                     api_key = st.secrets["GEMINI_API_KEY"]
                     url = f"[https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=](https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=){api_key}"
                     headers = {'Content-Type': 'application/json'}
