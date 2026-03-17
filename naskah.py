@@ -10,7 +10,7 @@ def run():
     # --- 2. PROMPT DIREKTUR KREATIF (VERSI NATURAL & AWAM) ---
     DIREKTUR_PROMPT = """
 [PERAN]
-Kamu adalah Direktur Kreatif Script Alih Suara. Tugasmu adalah menyusun naskah Text-to-Speech (TTS) yang terdengar natural, berjiwa, dan tidak kaku JIKA dibaca oleh mesin AI.
+Kamu adalah Direktur Kreatif Script dan Copywriting. Tugasmu adalah menyusun naskah yang terdengar natural, berjiwa, dan tidak kaku, yang juga dioptimalkan JIKA dibaca oleh mesin AI (Text-to-Speech).
 
 [ALUR KERJA]
 Berdasarkan data wawancara pengguna, susunlah output sebagai berikut:
@@ -18,19 +18,20 @@ Berdasarkan data wawancara pengguna, susunlah output sebagai berikut:
 1. 💡 Penjelasan Singkat:
 Jelaskan dengan bahasa yang SANGAT SEDERHANA (bahasa awam yang ramah) mengapa naskah ini dibuat seperti ini. Hindari sama sekali istilah teknis industri, kode pemrograman, atau kata-kata rumit.
 
-2. 🎛️ Arahan Rekaman:
-Berikan panduan sederhana mengenai tone dan suasana (misal: "Gunakan suara Wanita dengan kecepatan sedang").
+2. 🎛️ Arahan Rekaman / Publikasi:
+Berikan panduan sederhana mengenai tone dan suasana (misal: "Gunakan suara Wanita dengan kecepatan sedang" atau "Gunakan banyak emoji jika ini untuk caption media sosial").
 
 3. 🎙️ Naskah Final:
 Kamu WAJIB membungkus naskah di dalam kotak kode (markdown code block) dengan format ```text ... ```.
-PENTING UNTUK RITME MESIN:
-- DILARANG menggunakan kode SSML, tanda kurung (), atau kurung siku [] yang berisi instruksi emosi di dalam naskah. Naskah harus berisi murni kata-kata yang akan diucapkan mesin.
-- Gunakan TANDA BACA biasa secara cerdas untuk mengatur ritme mesin pembaca.
+PENTING UNTUK RITME MESIN & KETERBACAAN:
+- Sesuaikan gaya bahasa dengan Platform (Konteks) yang dipilih pengguna. Jika untuk Caption IG/WA, buat semenarik mungkin untuk dibaca. Jika untuk Video/YouTube, buat senatural mungkin untuk didengar.
+- DILARANG menggunakan kode SSML, tanda kurung (), atau kurung siku [] yang berisi instruksi emosi di dalam naskah. Naskah harus berisi murni kata-kata.
+- Gunakan TANDA BACA biasa secara cerdas untuk mengatur ritme.
 - Gunakan tanda koma (,) untuk jeda napas pendek.
 - Gunakan tanda titik (.) untuk jeda napas panjang atau di akhir kalimat.
-- Tuliskan angka menjadi kata-kata jika perlu (misal "Rp 10.000" menjadi "sepuluh ribu rupiah") agar mesin tidak salah baca.
+- Tuliskan angka menjadi kata-kata jika perlu (misal "Rp 10.000" menjadi "sepuluh ribu rupiah") agar mesin tidak salah baca jika dijadikan Voice Over.
 
-PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan siap dibaca langsung oleh mesin rekaman.
+PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan siap digunakan.
     """
 
     # --- 3. SETUP KREDENSIAL GEMINI ---
@@ -49,7 +50,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         st.session_state.jawaban = {
             "produk": "", 
             "poin_penting": "", 
-            "tujuan": "",  # Baru ditambahkan
+            "tujuan": "",
             "durasi": "", 
             "audiens": "", 
             "vibe": "", 
@@ -119,7 +120,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
     # LANGKAH 3: TUJUAN & DURASI
     # ==========================================
     elif st.session_state.wizard_step == 3:
-        st.subheader("Langkah 3 dari 6: Tujuan & Target Durasi")
+        st.subheader("Langkah 3 dari 6: Tujuan & Target Panjang/Durasi")
         
         # Penambahan Tujuan Pembuatan Naskah
         pilihan_tujuan = st.selectbox("Apa tujuan pembuatan naskah ini?", 
@@ -135,12 +136,12 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
 
         st.markdown("<br>", unsafe_allow_html=True) # Memberi sedikit jarak
 
-        pilihan_durasi = st.selectbox("Berapa detik target durasi naskah Anda?", 
-                               ["Pilih...", "15 detik (Singkat / Iklan Cepat)", "30 detik (Standar Iklan/Reels)", "60 detik (Edukasi / Penjelasan Lengkap)", "Isi sendiri..."])
+        pilihan_durasi = st.selectbox("Berapa panjang atau target durasi naskah Anda?", 
+                               ["Pilih...", "15 detik (Singkat / Iklan Cepat / Pesan Pendek)", "30 detik (Standar Iklan/Reels/Caption Menedah)", "60 detik (Edukasi / Penjelasan Lengkap)", "Isi sendiri..."])
         
         jawaban_durasi = pilihan_durasi
         if pilihan_durasi == "Isi sendiri...":
-            jawaban_durasi = st.text_input("Masukkan durasi yang Anda inginkan (misal: 45 detik):")
+            jawaban_durasi = st.text_input("Masukkan target panjang naskah (misal: 45 detik atau 2 paragraf):")
             
             # --- LOGIKA PEMBATASAN DURASI (HARD CAP 180 DETIK) ---
             if jawaban_durasi:
@@ -219,7 +220,13 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         st.subheader("Langkah 5 dari 6: Konteks & Koreksi")
         
         pilihan_konteks = st.selectbox("Naskah ini akan digunakan untuk platform apa?", 
-                               ["Pilih...", "Video Pendek (TikTok/Reels/Shorts)", "Audio Presentasi / Komunitas", "Voice Over Video YouTube", "Isi sendiri..."])
+                               ["Pilih...", 
+                                "Video Pendek (TikTok / Reels / Shorts)", 
+                                "Voice Over Video YouTube", 
+                                "Audio Presentasi / Komunitas", 
+                                "Pesan Teks (WhatsApp / Telegram / Threads)",
+                                "Caption Media Sosial (Instagram / Facebook / TikTok)",
+                                "Isi sendiri..."])
         
         jawaban_konteks = pilihan_konteks
         if pilihan_konteks == "Isi sendiri...":
@@ -234,7 +241,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         edit_tujuan = st.text_input("3. Tujuan Naskah", value=st.session_state.jawaban.get("tujuan", ""))
         
         # Kolom durasi dengan proteksi real-time
-        edit_durasi = st.text_input("4. Target Durasi", value=st.session_state.jawaban.get("durasi", ""))
+        edit_durasi = st.text_input("4. Target Panjang/Durasi", value=st.session_state.jawaban.get("durasi", ""))
         if edit_durasi:
             angka_ditemukan = re.findall(r'\d+', edit_durasi)
             if angka_ditemukan:
