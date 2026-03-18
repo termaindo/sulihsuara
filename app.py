@@ -6,7 +6,7 @@ from modules import vo
 from modules import infografis
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Studio Alih Suara Pro", page_icon="🎙️", layout="wide")
+st.set_page_config(page_title="Studio Kreatif Pro", page_icon="🎙️", layout="wide")
 
 # --- INISIALISASI STATE ---
 if 'nama_pengguna' not in st.session_state:
@@ -16,7 +16,7 @@ if 'menu_aktif' not in st.session_state:
 
 # --- HALAMAN PENYAPAAN (LOGIN NAMA) ---
 if st.session_state.nama_pengguna == "":
-    st.title("🎙️ Selamat Datang di Studio Alih Suara Pro")
+    st.title("🎙️ Selamat Datang di Studio Kreatif Pro")
     st.markdown("Sebelum kita mulai memproduksi naskah dan rekaman yang memukau, bolehkah saya tahu dengan siapa saya berinteraksi?")
     
     with st.form("form_nama"):
@@ -32,7 +32,7 @@ if st.session_state.nama_pengguna == "":
     st.stop() # Hentikan eksekusi kode di bawahnya sampai nama diisi
 
 # --- HEADER & NAVIGASI HALAMAN UTAMA ---
-st.title("🎙️ Studio Alih Suara Pro")
+st.title("🎙️ Studio Kreatif Pro")
 st.markdown(f"Halo, sobat **{st.session_state.nama_pengguna}**! Pilih ruangan kerja Anda di bawah ini:")
 
 # Membuat 3 tombol sejajar sebagai menu utama
