@@ -70,8 +70,8 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                                ["Pilih...", 
                                 "Aplikasi Sehat - Konsultan IF",
                                 "Aplikasi Expert Stock Pro - Konsultan Saham Indonesia",
-                                "Produk Kesehatan & Perawatan Pribadi", 
-                                "Makanan, Minuman & Suplemen", 
+                                "Produk Kesehatan & Suplemen", 
+                                "Makanan & Minuman", 
                                 "Layanan / Jasa Komunitas", 
                                 "Barang Elektronik / Gadget", 
                                 "Acara / Webinar",
@@ -98,8 +98,8 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         # Logika Kategori Umum (Memicu pertanyaan Merk & Jenis Spesifik)
         produk_terpilih = st.session_state.jawaban.get("produk", "")
         kategori_umum = [
-            "Produk Kesehatan & Perawatan Pribadi", 
-            "Makanan, Minuman & Suplemen", 
+            "Produk Kesehatan & Suplemen", 
+            "Makanan & Minuman", 
             "Layanan / Jasa Komunitas", 
             "Barang Elektronik / Gadget", 
             "Acara / Webinar"
@@ -112,7 +112,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         if produk_terpilih in kategori_umum:
             st.info(f"💡 Anda memilih kategori umum **{produk_terpilih}**. Mohon lengkapi detail berikut:")
             merk_input = st.text_input("Apa Merk / Brand produk Anda?", value=st.session_state.jawaban.get("merk", ""))
-            jenis_input = st.text_input("Apa jenis produk / jasa Anda secara spesifik?", value=st.session_state.jawaban.get("jenis_spesifik", ""), placeholder="Misal: Sabun Cair Alami, Jasa Bersih AC, dll")
+            jenis_input = st.text_input("Apa jenis produk / jasa Anda secara spesifik?", value=st.session_state.jawaban.get("jenis_spesifik", ""), placeholder="Misal: Kopi Bubuk Arabika, Jasa Bersih AC, dll")
             st.markdown("<br>", unsafe_allow_html=True)
 
         pilihan = st.selectbox("Apa pesan utama atau keunggulan yang WAJIB disampaikan?", 
@@ -389,19 +389,32 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
             st.divider()
             
             # Notifikasi yang lebih ramah dan menenangkan bagi orang awam
-            st.info("💡 **Catatan:** Sistem kami akan otomatis menarik naskah di dalam kotak hitam di atas saat Anda berpindah ruangan. Silakan pilih ke mana Anda ingin memproses naskah ini selanjutnya:")
+            st.info("💡 **Catatan:** Sistem kami akan otomatis menarik naskah di dalam kotak hitam di atas saat Anda berpindah ruangan. Silakan pilih langkah selanjutnya:")
             
-            col1, col2, col3 = st.columns(3)
+            st.markdown("### Lanjut Produksi Karya:")
+            col1, col2 = st.columns(2)
             with col1:
-                if st.button("🔄 Buat Naskah Baru"):
-                    st.session_state.hasil_naskah = ""
-                    st.session_state.wizard_step = 1
-                    st.rerun()
-            with col2:
                 if st.button("🎨 Ke Studio Cetak (Visual)", use_container_width=True):
                     st.session_state.menu_aktif = "3. Studio Cetak"
                     st.rerun()
-            with col3:
+            with col2:
                 if st.button("🚀 Ke Studio Rekaman (VO)", use_container_width=True):
                     st.session_state.menu_aktif = "2. Studio Rekaman"
+                    st.rerun()
+                    
+            st.markdown("### Pembuatan Naskah Baru:")
+            col3, col4 = st.columns(2)
+            with col3:
+                # Tombol baru untuk repurposing content (kembali ke langkah 3 dengan data lama utuh)
+                if st.button("🔁 Buat Versi Platform Lain", use_container_width=True, help="Ubah tujuan atau format naskah tanpa perlu mengetik ulang data produk Anda."):
+                    st.session_state.hasil_naskah = ""
+                    st.session_state.wizard_step = 3
+                    st.rerun()
+            with col4:
+                if st.button("🔄 Reset & Buat Naskah Baru", use_container_width=True, help="Hapus semua data dan mulai dari awal."):
+                    st.session_state.hasil_naskah = ""
+                    # Membersihkan seluruh jawaban lama agar benar-benar tereset
+                    for key in st.session_state.jawaban.keys():
+                        st.session_state.jawaban[key] = ""
+                    st.session_state.wizard_step = 1
                     st.rerun()
