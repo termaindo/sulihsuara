@@ -8,8 +8,8 @@ import io # Modul tambahan untuk Google Drive
 
 # --- KONFIGURASI KUOTA ---
 FILE_KUOTA = "pemakaian_tts.json"
-BATAS_MAKSIMAL = 990000  # 1 Juta karakter, dengan batas aman 990 ribu
-BATAS_WARNING = 980000    # Peringatan di 980 Ribu karakter
+BATAS_MAKSIMAL = 995000  # 1 Juta karakter, dengan batas aman 995 ribu
+BATAS_WARNING = 990000    # Peringatan di 990 Ribu karakter
 
 # Fungsi untuk menghitung sisa hari dalam bulan ini
 def hitung_sisa_hari():
@@ -128,7 +128,7 @@ def run():
     pemakaian_saat_ini = st.session_state.kuota_terpakai
     persentase = min(pemakaian_saat_ini / BATAS_MAKSIMAL, 1.0)
     
-    st.caption(f"📊 **Pemakaian Kuota Gratis Bulan Ini (Tersinkron di Google Drive):** {pemakaian_saat_ini:,}")
+    st.caption(f"📊 **Pemakaian Kuota Gratis Bulan Ini (Tersinkron di Google Drive):** {pemakaian_saat_ini:,} / 995.000 karakter")
     st.progress(persentase)
     
     if pemakaian_saat_ini >= BATAS_WARNING:
@@ -287,3 +287,18 @@ def run():
                 st.error(f"Gagal memproduksi suara. Detail: {e}")
         else:
             st.warning("Silakan isi naskah terlebih dahulu.")
+
+    # --- 5. NAVIGASI KE RUANG LAIN ---
+    st.divider()
+    st.markdown("### 🚀 Lanjut Produksi Karya Lain")
+    st.info("💡 **Info:** Anda bisa membawa naskah ini ke Studio Cetak untuk diubah menjadi panduan desain visual, atau kembali ke Ruang Naskah untuk membuat draf baru.")
+    
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        if st.button("🎨 Ke Studio Cetak (Visual)", use_container_width=True):
+            st.session_state.menu_aktif = "3. Studio Cetak"
+            st.rerun()
+    with col_nav2:
+        if st.button("📝 Kembali ke Ruang Naskah", use_container_width=True):
+            st.session_state.menu_aktif = "1. Ruang Naskah"
+            st.rerun()
