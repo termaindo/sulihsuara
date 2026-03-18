@@ -79,7 +79,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_final = pilihan
         if pilihan == "Isi sendiri...":
-            jawaban_final = st.text_input("Sebutkan produk atau jasa Anda secara spesifik:")
+            jawaban_final = st.text_input("Sebutkan produk atau jasa Anda secara spesifik:", key="produk_custom_1")
 
         if st.button("Selanjutnya ➡️"):
             if jawaban_final and jawaban_final != "Pilih...":
@@ -111,8 +111,9 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         # Jika memilih kategori umum (bukan aplikasi khusus atau "isi sendiri")
         if produk_terpilih in kategori_umum:
             st.info(f"💡 Anda memilih kategori umum **{produk_terpilih}**. Mohon lengkapi detail berikut:")
-            merk_input = st.text_input("Apa Merk / Brand produk Anda?", value=st.session_state.jawaban.get("merk", ""))
-            jenis_input = st.text_input("Apa jenis produk / jasa Anda secara spesifik?", value=st.session_state.jawaban.get("jenis_spesifik", ""), placeholder="Misal: Sabun Cair Alami, Jasa Bersih AC, dll")
+            # Kunci 'key' ditambahkan agar state text input tidak hilang saat selectbox diklik
+            merk_input = st.text_input("Apa Merk / Brand produk Anda?", value=st.session_state.jawaban.get("merk", ""), key="merk_input_2")
+            jenis_input = st.text_input("Apa jenis produk / jasa Anda secara spesifik?", value=st.session_state.jawaban.get("jenis_spesifik", ""), placeholder="Misal: Sabun Cair Alami, Jasa Bersih AC, dll", key="jenis_input_2")
             st.markdown("<br>", unsafe_allow_html=True)
 
         pilihan = st.selectbox("Apa pesan utama atau keunggulan yang WAJIB disampaikan?", 
@@ -125,7 +126,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_final = pilihan
         if pilihan == "Isi sendiri...":
-            jawaban_final = st.text_area("Tuliskan poin penting/keunggulan produk Anda:")
+            jawaban_final = st.text_area("Tuliskan poin penting/keunggulan produk Anda:", key="poin_custom_2")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -163,7 +164,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_tujuan = pilihan_tujuan
         if pilihan_tujuan == "Isi sendiri...":
-            jawaban_tujuan = st.text_input("Sebutkan tujuan pembuatan naskah Anda:")
+            jawaban_tujuan = st.text_input("Sebutkan tujuan pembuatan naskah Anda:", key="tujuan_custom_3")
 
         st.markdown("<br>", unsafe_allow_html=True) # Memberi sedikit jarak
 
@@ -172,7 +173,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_durasi = pilihan_durasi
         if pilihan_durasi == "Isi sendiri...":
-            jawaban_durasi = st.text_input("Masukkan target panjang naskah (misal: 45 detik, 2 paragraf, atau 5 slide):")
+            jawaban_durasi = st.text_input("Masukkan target panjang naskah (misal: 45 detik, 2 paragraf, atau 5 slide):", key="durasi_custom_3")
             
             # --- LOGIKA PEMBATASAN DURASI (HARD CAP 180 DETIK) ---
             if jawaban_durasi:
@@ -222,14 +223,14 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_audiens = pilihan_audiens
         if pilihan_audiens == "Isi sendiri...":
-            jawaban_audiens = st.text_input("Masukkan target audiens Anda:")
+            jawaban_audiens = st.text_input("Masukkan target audiens Anda:", key="audiens_custom_4")
 
         pilihan_vibe = st.selectbox("Perasaan apa yang ingin dibangun?", 
                                ["Pilih...", "Semangat & Menggebu-gebu (Promosi)", "Tenang & Meyakinkan (Kesehatan/Edukasi)", "Santai & Menghibur (Kasual)", "Isi sendiri..."])
         
         jawaban_vibe = pilihan_vibe
         if pilihan_vibe == "Isi sendiri...":
-            jawaban_vibe = st.text_input("Masukkan vibe/emosi yang Anda inginkan:")
+            jawaban_vibe = st.text_input("Masukkan vibe/emosi yang Anda inginkan:", key="vibe_custom_4")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -265,28 +266,35 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         
         jawaban_konteks = pilihan_konteks
         if pilihan_konteks == "Isi sendiri...":
-            jawaban_konteks = st.text_input("Masukkan platform tujuan Anda:")
+            jawaban_konteks = st.text_input("Masukkan platform tujuan Anda:", key="konteks_custom_5")
 
         st.divider()
         st.info("📋 **Periksa Kembali Panduan Naskah Anda:**\nSilakan edit langsung di dalam kotak jika ada yang ingin diubah sebelum diserahkan ke Direktur Kreatif.")
 
-        # Menampilkan input editable
-        edit_produk = st.text_input("1. Kategori Produk/Jasa", value=st.session_state.jawaban.get("produk", ""))
+        # Menampilkan input editable (semua diberikan kunci/key agar stabil)
+        edit_produk = st.text_input("1. Kategori Produk/Jasa", value=st.session_state.jawaban.get("produk", ""), key="edit_produk_5")
         
-        # Tampilkan input edit merk & jenis JIKA sebelumnya diisi (atau jika mereka mengubah produk menjadi kategori umum)
-        kategori_umum = ["Produk Kesehatan & Suplemen", "Makanan & Minuman", "Layanan / Jasa Komunitas", "Barang Elektronik / Gadget", "Acara / Webinar"]
+        # Penyesuaian nama kategori persis seperti di Langkah 1 & 2
+        kategori_umum = [
+            "Produk Kesehatan & Perawatan Pribadi", 
+            "Makanan, Minuman & Suplemen", 
+            "Layanan / Jasa Komunitas", 
+            "Barang Elektronik / Gadget", 
+            "Acara / Webinar"
+        ]
+        
         edit_merk = st.session_state.jawaban.get("merk", "")
         edit_jenis = st.session_state.jawaban.get("jenis_spesifik", "")
         
         if edit_produk in kategori_umum or edit_merk or edit_jenis:
-            edit_merk = st.text_input("1a. Merk / Brand", value=edit_merk)
-            edit_jenis = st.text_input("1b. Jenis Spesifik", value=edit_jenis)
+            edit_merk = st.text_input("1a. Merk / Brand", value=edit_merk, key="edit_merk_5")
+            edit_jenis = st.text_input("1b. Jenis Spesifik", value=edit_jenis, key="edit_jenis_5")
 
-        edit_poin = st.text_input("2. Poin Penting", value=st.session_state.jawaban.get("poin_penting", ""))
-        edit_tujuan = st.text_input("3. Tujuan Naskah", value=st.session_state.jawaban.get("tujuan", ""))
+        edit_poin = st.text_input("2. Poin Penting", value=st.session_state.jawaban.get("poin_penting", ""), key="edit_poin_5")
+        edit_tujuan = st.text_input("3. Tujuan Naskah", value=st.session_state.jawaban.get("tujuan", ""), key="edit_tujuan_5")
         
         # Kolom durasi dengan proteksi real-time
-        edit_durasi = st.text_input("4. Target Panjang/Durasi", value=st.session_state.jawaban.get("durasi", ""))
+        edit_durasi = st.text_input("4. Target Panjang/Durasi", value=st.session_state.jawaban.get("durasi", ""), key="edit_durasi_5")
         if edit_durasi:
             angka_ditemukan = re.findall(r'\d+', edit_durasi)
             if angka_ditemukan:
@@ -306,9 +314,9 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                     st.warning("⏳ **Perhatian:** Maksimal target durasi adalah **180 detik (3 menit)**. Sistem akan menggunakan batas maksimal tersebut untuk naskah Anda.")
                     edit_durasi = "180 detik (Batas maksimal)"
 
-        edit_audiens = st.text_input("5. Target Audiens", value=st.session_state.jawaban.get("audiens", ""))
-        edit_vibe = st.text_input("6. Suasana", value=st.session_state.jawaban.get("vibe", ""))
-        edit_tambahan = st.text_area("Catatan Tambahan (Opsional)", placeholder="Misal: Wajib sebutkan kata 'Autofagi'.")
+        edit_audiens = st.text_input("5. Target Audiens", value=st.session_state.jawaban.get("audiens", ""), key="edit_audiens_5")
+        edit_vibe = st.text_input("6. Suasana", value=st.session_state.jawaban.get("vibe", ""), key="edit_vibe_5")
+        edit_tambahan = st.text_area("Catatan Tambahan (Opsional)", placeholder="Misal: Wajib sebutkan kata 'Autofagi'.", key="edit_tambahan_5")
 
         col1, col2 = st.columns(2)
         with col1:
