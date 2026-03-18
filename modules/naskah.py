@@ -181,7 +181,7 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         st.markdown("<br>", unsafe_allow_html=True) # Memberi sedikit jarak
 
         pilihan_durasi = st.selectbox("Berapa panjang atau target durasi naskah Anda?", 
-                               ["Pilih...", "15 detik (Singkat / Iklan Cepat / Pesan Pendek)", "30 detik (Standar Iklan/Reels/Caption Menedah)", "60 detik (Edukasi / Penjelasan Lengkap)", "Isi sendiri..."])
+                               ["Pilih...", "15 detik (Singkat / Iklan Cepat / Pesan Pendek)", "30 detik (Standar Iklan/Reels/Caption Menengah)", "60 detik (Edukasi / Penjelasan Lengkap)", "Isi sendiri..."])
         
         jawaban_durasi = pilihan_durasi
         if pilihan_durasi == "Isi sendiri...":
@@ -398,9 +398,6 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                 
             with st.spinner("Direktur sedang menyusun naskah yang natural dan berjiwa..."):
                 try:
-                    # MENGGUNAKAN gemini-pro: Alias paling stabil dan universal di semua region/versi library.
-                    model_direktur = genai.GenerativeModel(model_name="gemini-pro")
-                    
                     # Logika Hard Cap & Format Khusus
                     instruksi_tambahan_platform = ""
                     if "Threads" in st.session_state.jawaban['konteks']:
@@ -425,7 +422,28 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                     - Catatan Tambahan: {st.session_state.jawaban['tambahan'] if st.session_state.jawaban['tambahan'] else "Tidak ada"}
                     """
                     
-                    response = model_direktur.generate_content(prompt_final)
+                    # --------------------------------------------------------------------------------
+                    # SISTEM AUTO-FALLBACK MODEL AI (SOLUSI 404 & 429)
+                    # --------------------------------------------------------------------------------
+                    # Aplikasi akan mencoba model dengan kuota gratis paling besar (1.5 Flash), 
+                    # jika library belum mendukung (404), ia turun ke (1.0 Pro), 
+                    # jika 404 juga, ia turun ke (2.5 Flash).
+                    try:
+                        model_direktur = genai.GenerativeModel(model_name="gemini-1.5-flash")
+                        response = model_direktur.generate_content(prompt_final)
+                    except Exception as inner_e:
+                        if "404" in str(inner_e):
+                            try:
+                                model_direktur = genai.GenerativeModel(model_name="gemini-1.0-pro")
+                                response = model_direktur.generate_content(prompt_final)
+                            except Exception:
+                                model_direktur = genai.GenerativeModel(model_name="gemini-2.5-flash")
+                                response = model_direktur.generate_content(prompt_final)
+                        else:
+                            # Jika errornya bukan 404 (misal: 429 Limit Quota), lempar ke blok utama
+                            raise inner_e
+                    # --------------------------------------------------------------------------------
+
                     st.session_state.hasil_naskah = response.text
                     st.rerun()
                 except Exception as e:
