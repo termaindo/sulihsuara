@@ -119,7 +119,7 @@ def run():
 
                     # --- SISTEM AUTO-FALLBACK MODEL AI CERDAS ---
                     # Mencoba dari model dengan kuota gratis paling besar hingga yang terkecil
-                    models_to_try = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.0-pro", "gemini-2.5-flash"]
+                    models_to_try = ["gemini-1.5-flash", "gemini-1.0-pro", "gemini-2.5-flash"]
                     response = None
                     last_error = None
                     
@@ -144,7 +144,7 @@ def run():
                     error_msg = str(e)
                     if "429" in error_msg or "Quota exceeded" in error_msg:
                         # Mendeteksi apakah ini batas harian (20 limit) atau batas RPM (menit)
-                        if "limit: 20" in error_msg or "PerDay" in error_msg:
+                        if "limit" in error_msg.lower() or "perday" in error_msg.lower():
                             st.error("⏳ **Kuota Harian AI Terkuras Habis!** Anda telah melewati batas maksimal permintaan gratis per hari dari Google. Silakan ganti API Key dengan akun Google lain, atau tunggu esok hari.")
                         else:
                             st.error("⏳ **Sistem AI Sedang Sibuk!** Anda melakukan permintaan terlalu cepat. Silakan tunggu sekitar **1 menit** sebelum mencoba lagi.")
@@ -171,7 +171,7 @@ def run():
                     prompt_minta_gambar = f"Create a highly detailed image generation prompt in English for an infographic poster based on this text. Make it visually appealing, modern, clean, with appropriate colors and layout. Include dummy text elements. Limit to 1 paragraph. Text:\n{st.session_state.blueprint_infografis}"
                     
                     # --- AUTO-FALLBACK UNTUK PROMPT GENERATOR ---
-                    models_to_try = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.0-pro", "gemini-2.5-flash"]
+                    models_to_try = ["gemini-1.5-flash", "gemini-1.0-pro", "gemini-2.5-flash"]
                     prompt_en = None
                     last_error_prompt = None
                     
@@ -190,7 +190,7 @@ def run():
                     if not prompt_en:
                         raise last_error_prompt
 
-                    # 2. Panggil API Image Generation Google (URL BERSIH)
+                    # 2. Panggil API Image Generation Google (URL BERSIH TOTAL)
                     api_key = st.secrets["GEMINI_API_KEY"]
                     url = f"[https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=](https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=){api_key}"
                     headers = {'Content-Type': 'application/json'}
@@ -225,7 +225,7 @@ def run():
                 except Exception as e:
                     error_msg = str(e)
                     if "429" in error_msg or "Quota exceeded" in error_msg:
-                        if "limit: 20" in error_msg or "PerDay" in error_msg:
+                        if "limit" in error_msg.lower() or "perday" in error_msg.lower():
                             st.error("⏳ **Kuota Harian AI Terkuras Habis!** Anda telah melewati batas harian. Silakan ganti API Key Anda.")
                         else:
                             st.error("⏳ **Sistem AI Sedang Sibuk!** Silakan tunggu sekitar **1 menit** sebelum mencoba cetak gambar lagi.")
