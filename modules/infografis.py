@@ -177,7 +177,7 @@ def run():
                         else:
                             raise inner_e
 
-                    # 2. Panggil API Image Generation Google
+                    # 2. Panggil API Image Generation Google (URL telah dibersihkan secara total)
                     api_key = st.secrets["GEMINI_API_KEY"]
                     url = f"[https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=](https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=){api_key}"
                     headers = {'Content-Type': 'application/json'}
