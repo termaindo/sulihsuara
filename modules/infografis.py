@@ -49,10 +49,11 @@ def is_quota_ok():
 # ==========================================
 # 🧩 2. GROQ Llama 3.3 70B WRAPPER (JSON & PROMPT OPTIMIZER)
 # ==========================================
-def generate_structured_text_groq(prompt_text, opsi_slide):
+def generate_structured_text_groq(prompt_text, opsi_slide, opsi_dimensi):
     """
     Menggunakan Groq untuk memecah naskah menjadi JSON Slide 
-    sekaligus meracik Positive & Negative Prompt untuk Image Generator.
+    sekaligus meracik Positive & Negative Prompt untuk Image Generator,
+    disesuaikan dengan Dimensi yang dipilih.
     """
     groq_key = st.secrets.get("GROQ_API_KEY")
     if not groq_key:
@@ -64,27 +65,27 @@ def generate_structured_text_groq(prompt_text, opsi_slide):
         "Content-Type": "application/json"
     }
 
-    system_prompt = """Kamu adalah Ahli Desain Visual dan Prompt Engineer Profesional.
+    system_prompt = f"""Kamu adalah Ahli Desain Visual dan Prompt Engineer Profesional.
 Tugasmu memecah teks menjadi slide infografis dan membuat 'image_prompt' (deskripsi gambar SANGAT DETAIL dalam Bahasa Inggris) serta 'negative_prompt' (elemen yang harus dihindari) untuk disuapkan ke AI Pelukis (Stable Diffusion).
 Format output HARUS JSON valid dengan struktur berikut:
-{
+{{
   "slides": [
-    {
+    {{
       "slide_number": 1,
       "title": "Judul Slide",
-      "content": "Teks ringkas 1-2 kalimat",
-      "image_prompt": "professional infographic illustration, highly detailed, clean vector, minimalist, [objek utama]...",
+      "content": "Teks ringkas (sesuaikan kepadatan dengan dimensi {opsi_dimensi}). HINDARI TEKS TERLALU PANJANG JIKA DIMENSI SQUARE.",
+      "image_prompt": "professional infographic illustration, highly detailed, clean vector, minimalist, [objek utama]... (sesuaikan komposisi/aspect ratio untuk {opsi_dimensi})",
       "negative_prompt": "text, watermark, ugly, blurry, deformed, cluttered"
-    }
+    }}
   ]
-}"""
+}}"""
 
     # Kita menggunakan Mode JSON dari Groq agar output dijamin tidak rusak
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Target Jumlah Slide: {opsi_slide}\nTeks Dasar yang harus diproses:\n{prompt_text}"}
+            {"role": "user", "content": f"Dimensi Target: {opsi_dimensi}\nTarget Jumlah Slide: {opsi_slide}\nTeks Dasar yang harus diproses:\n{prompt_text}"}
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.5
@@ -223,8 +224,8 @@ def render_html_cards(pages):
 # 🚀 MAIN APP RUNNER
 # ==========================================
 def run():
-    st.title("🎨 Ruang 3: Studio Kreasi Cetak/Visual")
-    st.info("💡 **Ditenagai infrastruktur Multi-AI terbaru untuk kreasi gambar untuk dibagikan atau di-posting ke berbagai Medsos.")
+    st.title("🎨 Ruang 3: Studio Cetak (Visual & Infografis)")
+    st.info("💡 **Ditenagai Groq Llama 3.3 70B & Hugging Face:** Modul ini telah 100% menggunakan infrastruktur Multi-AI terbaru untuk kecepatan kilat dan stabilitas Visual (SVDS).")
 
     # 1. TARIK NASKAH DARI STATE SECARA AMAN (ANTI CUT-OFF)
     raw_text = st.session_state.get("hasil_naskah", "")
@@ -245,10 +246,11 @@ def run():
 
     # 2. USER INPUT (UI)
     st.markdown("### 🎛️ Pengaturan Sistem & Desain")
+    
     col1, col2 = st.columns(2)
     with col1:
         user_mode = st.selectbox(
-            "Pilih Mode Render:",
+            "1. Pilih Mode Render:",
             options=["cepat", "visual", "lengkap"],
             index=0,
             format_func=lambda x: {
@@ -257,13 +259,44 @@ def run():
                 "lengkap": "🌟 Lengkap (Gambar Tiap Slide)"
             }.get(x)
         )
+        
+        opsi_dimensi = st.selectbox(
+            "2. Ukuran Dimensi / Platform:", 
+            [
+                "Pilih...",
+                "1080 x 1080 px (Square / IG Feed)",
+                "1080 x 1350 px (Portrait / IG Feed)",
+                "1080 x 1920 px (Vertical / IG Story / TikTok)",
+                "1920 x 1080 px (Landscape / Presentasi PPT / YouTube)"
+            ]
+        )
+        
     with col2:
-        opsi_slide = st.selectbox("Target Jumlah Slide:", ["Otomatis", "3 Slide", "5 Slide", "10 Slide"])
+        opsi_slide = st.selectbox(
+            "3. Target Jumlah Slide:", 
+            [
+                "Pilih...", 
+                "Otomatis", 
+                "1 Slide (Satu Halaman Penuh)", 
+                "3 Slide", 
+                "5 Slide", 
+                "10 Slide", 
+                "Isi sendiri..."
+            ]
+        )
+        
+        jawaban_slide = opsi_slide
+        if opsi_slide == "Isi sendiri...":
+            jawaban_slide = st.text_input("Masukkan target jumlah slide (misal: 7 slide, 2 halaman, dll):", placeholder="Contoh: 7 slide")
 
     user_input = st.text_area("Draft Naskah Dasar:", value=naskah_final, height=150)
 
     # 3. PROSES EKSEKUSI
     if st.button("✨ Hasilkan Infografis Cerdas", use_container_width=True, type="primary"):
+        if opsi_dimensi == "Pilih..." or jawaban_slide == "Pilih..." or not jawaban_slide.strip():
+            st.warning("⚠️ Mohon lengkapi pilihan Dimensi dan Target Jumlah Slide terlebih dahulu!")
+            return
+            
         if not user_input.strip():
             st.warning("⚠️ Draft naskah tidak boleh kosong!")
             return
@@ -271,7 +304,7 @@ def run():
         with st.spinner("🤖 Groq Llama 3.3 sedang mengoptimasi prompt & menstrukturkan data..."):
             try:
                 # A. TEXT & PROMPT GENERATION VIA GROQ
-                pages = generate_structured_text_groq(user_input, opsi_slide)
+                pages = generate_structured_text_groq(user_input, jawaban_slide, opsi_dimensi)
                 
                 num_pages = len(pages)
                 quota_ok = is_quota_ok()
