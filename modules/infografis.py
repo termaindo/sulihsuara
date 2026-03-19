@@ -1,98 +1,69 @@
 import streamlit as st
 import re
-import os
 import json
 import requests
 import base64
 import time
+import textwrap
+import urllib.request
+from io import BytesIO
+
+# Memasukkan library pengolah gambar bawaan Python (Pillow)
+from PIL import Image, ImageDraw, ImageFont
 
 # ==========================================
-# 🧩 1. SAFE IMAGE GENERATOR (HUGGING FACE)
+# 🧩 1. HUGGING FACE IMAGE GENERATOR (FLUX)
 # ==========================================
-def generate_image_with_retry(prompt, negative_prompt="", dimensi=""):
-    """Fungsi pembuat gambar dengan Hugging Face yang kebal terhadap Model Loading (503) & Mendukung Dimensi."""
+def generate_image_with_retry(prompt, dimensi=""):
+    """Menggunakan model FLUX.1 yang lebih modern dan anti-error di Hugging Face."""
     hf_key = st.secrets.get("HUGGINGFACE_API_KEY")
     if not hf_key:
         st.warning("⚠️ Kunci HUGGINGFACE_API_KEY tidak ditemukan!")
         return None
         
-    # PERBAIKAN: Menggunakan URL router terbaru dari Hugging Face
-    API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
+    # Menggunakan FLUX.1-schnell (Sangat cepat dan realistis)
+    API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
     headers = {"Authorization": f"Bearer {hf_key}"}
     
-    # Menyesuaikan resolusi (Width & Height) sesuai pilihan pengguna
-    w, h = 1024, 1024 # Default Square
-    if "Portrait" in dimensi:
-        w, h = 896, 1152
-    elif "Vertical" in dimensi:
-        w, h = 768, 1344
-    elif "Landscape" in dimensi:
-        w, h = 1344, 768
+    # Resolusi default untuk ilustrasi tengah (Kita pakai square agar mudah di-layout)
+    w, h = 1024, 1024 
 
     payload = {
         "inputs": prompt,
         "parameters": {
-            "negative_prompt": negative_prompt,
             "width": w,
             "height": h
         }
     }
     
-    # Mekanisme Retry (Hugging Face API sering kali butuh waktu pemanasan)
     for attempt in range(3):
-        response = requests.post(API_URL, headers=headers, json=payload)
-        
-        if response.status_code == 200:
-            encoded = base64.b64encode(response.content).decode('utf-8')
-            return f"data:image/png;base64,{encoded}"
-        elif response.status_code == 503:
-            # Jika Model Loading, tunggu 5 detik lalu coba lagi
-            time.sleep(5)
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=40)
+            if response.status_code == 200:
+                encoded = base64.b64encode(response.content).decode('utf-8')
+                return f"data:image/png;base64,{encoded}"
+            elif response.status_code == 503:
+                time.sleep(5) # Tunggu mesin pemanasan
+                continue
+            else:
+                st.warning(f"⚠️ Pelukis AI Error: {response.text}")
+                return None
+        except Exception as e:
+            time.sleep(3)
             continue
-        else:
-            # Jika error lain (seperti kuota habis/kunci salah)
-            st.warning(f"⚠️ Pelukis AI Error: {response.text}")
-            return None
             
-    st.warning("⚠️ Mesin Pelukis Hugging Face sedang sangat sibuk. Menggunakan Mode Cepat sementara.")
     return None
 
-def safe_generate_image(prompt, negative_prompt="", dimensi=""):
-    """Wraper cache cerdas agar tidak mencache kegagalan (NULL)"""
-    # Inisialisasi custom cache di session_state
-    if "img_cache" not in st.session_state:
-        st.session_state.img_cache = {}
-        
-    cache_key = f"{prompt}_{dimensi}"
-    
-    # Jika sudah sukses dilukis sebelumnya, ambil dari cache
-    if cache_key in st.session_state.img_cache:
-        return st.session_state.img_cache[cache_key]
-        
-    # Jika belum, lukis gambar baru
-    img_result = generate_image_with_retry(prompt, negative_prompt, dimensi)
-    
-    # HANYA simpan ke cache jika sukses!
-    if img_result:
-        st.session_state.img_cache[cache_key] = img_result
-        
-    return img_result
-
-def is_quota_ok():
-    """Mengecek apakah API Key Hugging Face tersedia."""
-    return bool(st.secrets.get("HUGGINGFACE_API_KEY"))
-
 # ==========================================
-# 🧩 2. GROQ Llama 3.3 70B WRAPPER (JSON & PROMPT OPTIMIZER)
+# 🧩 2. GROQ Llama 3.3 70B WRAPPER
 # ==========================================
-def generate_structured_text_groq(prompt_text, opsi_slide, opsi_dimensi):
+def generate_structured_text_groq(prompt_text, opsi_slide):
     """
-    Menggunakan Groq untuk memecah naskah menjadi JSON Slide 
-    sekaligus meracik Positive & Negative Prompt untuk Image Generator.
+    Menggunakan Groq untuk menstrukturkan data menjadi format Judul, Gambar, dan Poin-poin.
     """
     groq_key = st.secrets.get("GROQ_API_KEY")
     if not groq_key:
-        raise Exception("GROQ_API_KEY tidak ditemukan di st.secrets! Silakan tambahkan terlebih dahulu.")
+        raise Exception("GROQ_API_KEY tidak ditemukan di st.secrets!")
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -100,172 +71,199 @@ def generate_structured_text_groq(prompt_text, opsi_slide, opsi_dimensi):
         "Content-Type": "application/json"
     }
 
-    system_prompt = f"""Kamu adalah Ahli Desain Visual dan Prompt Engineer Profesional.
-Tugasmu memecah teks menjadi slide infografis dan membuat 'image_prompt' (deskripsi gambar SANGAT DETAIL dalam Bahasa Inggris) serta 'negative_prompt' (elemen yang harus dihindari) untuk disuapkan ke AI Pelukis (Stable Diffusion).
+    system_prompt = f"""Kamu adalah Ahli Desain Visual dan Copywriter Profesional.
+Tugasmu merangkum teks menjadi format infografis padat.
 Format output HARUS JSON valid dengan struktur berikut:
 {{
-  "slides": [
+  "infographic_title": "Judul Utama Poster",
+  "image_prompt": "professional illustration, clean vector, minimalist, highly detailed, [objek utama]...",
+  "items": [
     {{
-      "slide_number": 1,
-      "title": "Judul Slide",
-      "content": "Teks ringkas (sesuaikan kepadatan dengan dimensi {opsi_dimensi}). HINDARI TEKS TERLALU PANJANG JIKA DIMENSI SQUARE.",
-      "image_prompt": "professional infographic illustration, highly detailed, clean vector, minimalist, [objek utama]... (sesuaikan komposisi/aspect ratio untuk {opsi_dimensi})",
-      "negative_prompt": "text, watermark, ugly, blurry, deformed, cluttered"
+      "title": "Sub Judul Poin 1",
+      "content": "Penjelasan sangat singkat, maksimal 2 baris."
+    }},
+    {{
+      "title": "Sub Judul Poin 2",
+      "content": "Penjelasan sangat singkat, maksimal 2 baris."
     }}
   ]
-}}"""
+}}
+ATURAN MUTLAK: Buat jumlah item dalam array 'items' sesuai dengan permintaan pengguna berikut: {opsi_slide}. Jika diminta '1 Slide', buatlah 4-5 poin utama agar pas di dalam satu halaman poster."""
 
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Dimensi Target: {opsi_dimensi}\nTarget Jumlah Slide: {opsi_slide}\nTeks Dasar yang harus diproses:\n{prompt_text}"}
+            {"role": "user", "content": f"Teks Dasar yang harus dirangkum menjadi Poin-Poin:\n{prompt_text}"}
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.5
     }
 
     response = requests.post(url, headers=headers, json=payload)
-    
     if response.status_code == 200:
         result = response.json()
         content_str = result["choices"][0]["message"]["content"]
-        data = json.loads(content_str)
-        return data.get("slides", [])
+        return json.loads(content_str)
     else:
         raise Exception(f"Gagal menghubungi Groq: {response.text}")
 
 # ==========================================
-# 🧩 3. SMART VISUAL DECISION SYSTEM (SVDS)
+# 🧩 3. AUTO-LAYOUT ENGINE (PILLOW POSTER MAKER)
 # ==========================================
-def decide_mode(user_mode, quota_ok, num_pages):
-    if user_mode == "cepat":
-        return "no_image"
-    if user_mode == "visual":
-        return "one_image" if quota_ok else "no_image"
-    if user_mode == "lengkap":
-        if quota_ok and num_pages <= 3:
-            return "multi_image"
-        elif quota_ok:
-            return "one_image"
-        else:
-            return "no_image"
-    return "no_image"
+def get_text_dimensions(draw, text, font):
+    """Fungsi pembantu dimensi font agar kompatibel dengan berbagai versi server"""
+    if hasattr(draw, 'textbbox'):
+        bbox = draw.textbbox((0, 0), text, font=font)
+        return bbox[2] - bbox[0], bbox[3] - bbox[1]
+    else:
+        return draw.textsize(text, font=font)
 
-# ==========================================
-# 🧩 4. HTML RENDERER ENGINE
-# ==========================================
-def render_html_cards(pages):
-    """Template HTML dinamis yang sangat kebal terhadap layout rusak/pecah."""
-    html_content = """
-    <style>
-        .infographic-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .slide-card {
-            display: flex;
-            flex-direction: row;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            overflow: hidden;
-            border: 1px solid #e0e0e0;
-            min-height: 250px;
-        }
-        .slide-content {
-            padding: 25px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .slide-number {
-            font-size: 0.8em;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-        }
-        .slide-title {
-            color: #2c3e50;
-            margin: 0 0 15px 0;
-            font-size: 1.5em;
-        }
-        .slide-text {
-            color: #555;
-            line-height: 1.6;
-            margin: 0;
-        }
-        .slide-image-container {
-            flex: 0 0 40%;
-            background: #f8f9fa;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-right: 1px solid #e0e0e0;
-            min-height: 250px;
-        }
-        .slide-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+@st.cache_resource
+def load_fonts():
+    """Mengunduh font standar industri (Roboto) untuk layout"""
+    try:
+        url_bold = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Bold.ttf"
+        url_reg = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
         
-        @media (max-width: 600px) {
-            .slide-card { flex-direction: column; }
-            .slide-image-container {
-                border-right: none;
-                border-bottom: 1px solid #e0e0e0;
-                height: 200px;
-                min-height: 200px;
-            }
+        bold_bytes = BytesIO(urllib.request.urlopen(url_bold).read())
+        reg_bytes = BytesIO(urllib.request.urlopen(url_reg).read())
+        
+        return {
+            "title": ImageFont.truetype(bold_bytes, 60),
+            "subtitle": ImageFont.truetype(bold_bytes, 40),
+            "body": ImageFont.truetype(reg_bytes, 32)
         }
-    </style>
-    <div class="infographic-container">
-    """
+    except:
+        default = ImageFont.load_default()
+        return {"title": default, "subtitle": default, "body": default}
+
+def create_infographic_poster(data_json, b64_img, opsi_dimensi):
+    """Menggabungkan Ilustrasi AI dan Teks ke dalam SATU Gambar PNG."""
+    fonts = load_fonts()
     
-    for page in pages:
-        img_html = ""
-        # 🧩 CONDITIONAL RENDERING
-        if page.get("image"):
-            img_html = f"""
-            <div class="slide-image-container">
-                <img src="{page['image']}" class="slide-image" alt="Ilustrasi">
-            </div>
-            """
-            
-        html_content += f"""
-        <div class="slide-card">
-            {img_html}
-            <div class="slide-content">
-                <div class="slide-number">Slide {page.get('slide_number', '-')}</div>
-                <h3 class="slide-title">{page.get('title', 'Judul')}</h3>
-                <p class="slide-text">{page.get('content', '')}</p>
-            </div>
-        </div>
-        """
+    # 1. Tentukan Lebar Kanvas berdasarkan Dimensi
+    canvas_w = 1080
+    if "Landscape" in opsi_dimensi:
+        canvas_w = 1920
         
-    html_content += "</div>"
-    return html_content
+    # Warna Tema (Desain Modern Bersih)
+    bg_color = (235, 245, 250) # Light blueish gray
+    card_color = (255, 255, 255)
+    text_dark = (30, 50, 70)
+    text_gray = (90, 100, 110)
+    primary_color = (20, 120, 100) # Dark Cyan
+    
+    # Kita buat kanvas super tinggi sementara, nanti di-crop sesuai isi
+    img = Image.new('RGB', (canvas_w, 4000), color=bg_color)
+    draw = ImageDraw.Draw(img)
+    
+    current_y = 80
+    
+    # 2. Cetak Judul Utama (Rata Tengah)
+    title = data_json.get("infographic_title", "Infografis Modern")
+    # Wrap teks agar tidak tumpah ke luar batas
+    wrap_width = 30 if canvas_w == 1080 else 55
+    wrapped_title = textwrap.wrap(title.upper(), width=wrap_width)
+    
+    for line in wrapped_title:
+        tw, th = get_text_dimensions(draw, line, fonts["title"])
+        x_pos = (canvas_w - tw) // 2
+        draw.text((x_pos, current_y), line, font=fonts["title"], fill=primary_color)
+        current_y += th + 15
+    current_y += 50
+    
+    # 3. Cetak dan Tempel Ilustrasi dari Hugging Face
+    if b64_img:
+        try:
+            img_data = base64.b64decode(b64_img.split(",")[1])
+            hf_image = Image.open(BytesIO(img_data)).convert("RGBA")
+            
+            # Hitung skala ukuran gambar (Lebar max 800px)
+            target_w = 800 if canvas_w == 1080 else 1000
+            ratio = target_w / hf_image.width
+            target_h = int(hf_image.height * ratio)
+            hf_image = hf_image.resize((target_w, target_h), Image.Resampling.LANCZOS)
+            
+            # Buat sudut melengkung pada ilustrasi
+            mask = Image.new('L', (target_w, target_h), 0)
+            draw_mask = ImageDraw.Draw(mask)
+            draw_mask.rounded_rectangle((0, 0, target_w, target_h), radius=40, fill=255)
+            
+            img.paste(hf_image, ((canvas_w - target_w) // 2, current_y), mask)
+            current_y += target_h + 80
+        except Exception as e:
+            print(f"Error pasting image: {e}")
+            
+    # 4. Cetak Kartu-Kartu Poin (Teks Keterangan)
+    items = data_json.get("items", [])
+    box_x = 80 if canvas_w == 1080 else 200
+    box_w = canvas_w - (box_x * 2)
+    
+    for idx, item in enumerate(items):
+        item_title = f"{idx+1}. {item.get('title', '')}"
+        item_content = item.get('content', '')
+        
+        wrap_tw = 40 if canvas_w == 1080 else 80
+        wrap_cw = 50 if canvas_w == 1080 else 100
+        
+        wrapped_ititle = textwrap.wrap(item_title, width=wrap_tw)
+        wrapped_icontent = textwrap.wrap(item_content, width=wrap_cw)
+        
+        # Hitung tinggi kotak
+        box_h = 40
+        for line in wrapped_ititle:
+            tw, th = get_text_dimensions(draw, line, fonts["subtitle"])
+            box_h += th + 10
+        for line in wrapped_icontent:
+            tw, th = get_text_dimensions(draw, line, fonts["body"])
+            box_h += th + 10
+            
+        # Gambar kotak putih membulat
+        draw.rounded_rectangle([box_x, current_y, box_x + box_w, current_y + box_h], 
+                               radius=25, fill=card_color, outline=(200, 220, 230), width=4)
+        
+        # Cetak Teks di dalam kotak
+        text_y = current_y + 25
+        for line in wrapped_ititle:
+            draw.text((box_x + 40, text_y), line, font=fonts["subtitle"], fill=text_dark)
+            tw, th = get_text_dimensions(draw, line, fonts["subtitle"])
+            text_y += th + 10
+            
+        text_y += 10
+        for line in wrapped_icontent:
+            draw.text((box_x + 40, text_y), line, font=fonts["body"], fill=text_gray)
+            tw, th = get_text_dimensions(draw, line, fonts["body"])
+            text_y += th + 10
+            
+        current_y += box_h + 40 # Jarak antar kotak
+        
+    # 5. Potong kanvas memanjang agar pas (Crop)
+    final_h = current_y + 60
+    img = img.crop((0, 0, canvas_w, final_h))
+    
+    # 6. Ekspor menjadi Base64 dan Bytes
+    output = BytesIO()
+    img.save(output, format="PNG")
+    img_bytes = output.getvalue()
+    
+    encoded = base64.b64encode(img_bytes).decode('utf-8')
+    return f"data:image/png;base64,{encoded}", img_bytes
+
 
 # ==========================================
 # 🚀 MAIN APP RUNNER
 # ==========================================
 def run():
     st.title("🎨 Ruang 3: Studio Cetak (Visual & Infografis)")
-    st.info("💡 **Ditenagai Groq Llama 3.3 70B & Hugging Face:** Modul ini telah 100% menggunakan infrastruktur Multi-AI terbaru untuk kecepatan kilat dan stabilitas Visual (SVDS).")
+    st.info("💡 **Ditenagai Groq Llama & Layout Engine Khusus:** Sistem akan menyusun teks dan menggambar ilustrasi menjadi **SATU file poster PNG** utuh yang siap Anda unduh.")
 
-    # 1. TARIK NASKAH DARI STATE SECARA AMAN (ANTI CUT-OFF)
     raw_text = st.session_state.get("hasil_naskah", "")
     if not raw_text:
         st.warning("Belum ada naskah yang ditarik. Silakan buat naskah terlebih dahulu di Ruang 1 (Rapat Naskah).")
         return
 
     naskah_final = raw_text
-    
     bt = chr(96) * 3 
     pattern = rf"{bt}(?:text|markdown|xml)?\n(.*?)({bt})"
     match_naskah = re.search(pattern, raw_text, re.DOTALL | re.IGNORECASE)
@@ -274,131 +272,79 @@ def run():
         naskah_final = match_naskah.group(1).strip()
         st.success("✅ Naskah dasar berhasil ditarik otomatis dari Ruang 1!")
 
-    # 2. USER INPUT (UI)
     st.markdown("### 🎛️ Pengaturan Sistem & Desain")
     
     col1, col2 = st.columns(2)
     with col1:
-        user_mode = st.selectbox(
-            "1. Pilih Mode Render:",
-            options=["cepat", "visual", "lengkap"],
-            index=0,
-            format_func=lambda x: {
-                "cepat": "⚡ Cepat (Teks Saja - Tanpa Gambar)",
-                "visual": "🖼️ Visual (1 Gambar Cover Saja)",
-                "lengkap": "🌟 Lengkap (Gambar Tiap Slide)"
-            }.get(x)
-        )
-        
         opsi_dimensi = st.selectbox(
-            "2. Ukuran Dimensi / Platform:", 
+            "1. Ukuran Poster / Platform:", 
             [
                 "Pilih...",
+                "1080 x 1920 px (Vertical / IG Story / TikTok) - DIREKOMENDASIKAN",
                 "1080 x 1080 px (Square / IG Feed)",
-                "1080 x 1350 px (Portrait / IG Feed)",
-                "1080 x 1920 px (Vertical / IG Story / TikTok)",
                 "1920 x 1080 px (Landscape / Presentasi PPT / YouTube)"
-            ]
+            ], index=1
         )
         
     with col2:
         opsi_slide = st.selectbox(
-            "3. Target Jumlah Slide:", 
+            "2. Mode Format Poster:", 
             [
                 "Pilih...", 
-                "Otomatis", 
-                "1 Slide (Satu Halaman Penuh)", 
-                "3 Slide", 
-                "5 Slide", 
-                "10 Slide", 
+                "1 Slide (Satu Halaman Penuh, Teks Menyatu)", 
                 "Isi sendiri..."
-            ]
+            ], index=1
         )
         
         jawaban_slide = opsi_slide
         if opsi_slide == "Isi sendiri...":
-            jawaban_slide = st.text_input("Masukkan target jumlah slide (misal: 7 slide, 2 halaman, dll):", placeholder="Contoh: 7 slide")
+            jawaban_slide = st.text_input("Instruksi spesifik (contoh: Buat jadi 5 poin utama):", placeholder="Contoh: 5 poin")
 
     user_input = st.text_area("Draft Naskah Dasar:", value=naskah_final, height=150)
 
-    # 3. PROSES EKSEKUSI
     if st.button("✨ Hasilkan Infografis Cerdas", use_container_width=True, type="primary"):
         if opsi_dimensi == "Pilih..." or jawaban_slide == "Pilih..." or not jawaban_slide.strip():
-            st.warning("⚠️ Mohon lengkapi pilihan Dimensi dan Target Jumlah Slide terlebih dahulu!")
+            st.warning("⚠️ Mohon lengkapi pilihan Ukuran Poster dan Mode Format terlebih dahulu!")
             return
             
         if not user_input.strip():
             st.warning("⚠️ Draft naskah tidak boleh kosong!")
             return
             
-        with st.spinner("🤖 Groq Llama 3.3 sedang mengoptimasi prompt & menstrukturkan data..."):
+        with st.spinner("🤖 Groq Llama 3.3 sedang membaca naskah dan merangkum poin-poin..."):
             try:
-                # A. TEXT & PROMPT GENERATION VIA GROQ
-                pages = generate_structured_text_groq(user_input, jawaban_slide, opsi_dimensi)
+                # 1. Analisis Naskah dengan Groq
+                structured_data = generate_structured_text_groq(user_input, jawaban_slide)
                 
-                num_pages = len(pages)
-                quota_ok = is_quota_ok()
-                
-                # B. SVDS (DECISION ENGINE)
-                final_mode = decide_mode(user_mode, quota_ok, num_pages)
-                st.info(f"🧠 **Keputusan SVDS:** Sistem menjalankan mode `{final_mode}`.")
-                
-                # C. IMPLEMENTASI PER MODE (HUGGING FACE)
-                with st.spinner("🎨 Merender elemen visual via Hugging Face (Harap tunggu, pelukis AI mungkin sedang bersiap)..."):
-                    if final_mode == "no_image":
-                        for page in pages:
-                            page["image"] = None
-                            
-                    elif final_mode == "one_image":
-                        main_prompt = pages[0].get("image_prompt", "Professional infographic design")
-                        neg_prompt = pages[0].get("negative_prompt", "ugly, text, watermark")
-                        # Mengirimkan opsi_dimensi ke pelukis
-                        img = safe_generate_image(main_prompt, neg_prompt, opsi_dimensi)
-                        for idx, page in enumerate(pages):
-                            page["image"] = img if idx == 0 else None
-                            
-                    elif final_mode == "multi_image":
-                        for page in pages:
-                            p_prompt = page.get("image_prompt", "Minimalist vector illustration")
-                            n_prompt = page.get("negative_prompt", "ugly, text, watermark")
-                            page["image"] = safe_generate_image(p_prompt, n_prompt, opsi_dimensi)
-                
-                # D. RENDER HTML (OUTPUT)
-                st.success("🎉 Infografis berhasil dirender!")
-                final_html = render_html_cards(pages)
-                st.components.v1.html(final_html, height=800, scrolling=True)
-                
-                # E. BAGIAN DOWNLOAD HASIL GAMBAR (BARU)
-                image_pages = [p for p in pages if p.get('image')]
-                if image_pages:
-                    st.divider()
-                    st.markdown("### 📥 Download Hasil Visual")
-                    cols = st.columns(len(image_pages))
+                with st.spinner("🎨 AI Pelukis sedang menggambar ilustrasi utama (sekitar 15-30 detik)..."):
+                    # 2. Gambar ilustrasi
+                    img_prompt = structured_data.get("image_prompt", "Professional vector infographic illustration")
+                    b64_illustration = generate_image_with_retry(img_prompt, opsi_dimensi)
                     
-                    for i, page in enumerate(image_pages):
-                        b64_data = page["image"].split(",")[1]
-                        img_bytes = base64.b64decode(b64_data)
+                    with st.spinner("📐 Layout Engine sedang menata letak teks dan gambar menjadi Poster PNG..."):
+                        # 3. Tata letak (Typesetting) menggunakan Python Pillow
+                        final_b64, final_bytes = create_infographic_poster(structured_data, b64_illustration, opsi_dimensi)
                         
-                        with cols[i]:
-                            st.image(img_bytes, caption=f"Visual Slide {page.get('slide_number', i+1)}")
-                            st.download_button(
-                                label=f"⬇️ Download Gambar {i+1}",
-                                data=img_bytes,
-                                file_name=f"infografis_visual_slide_{page.get('slide_number', i+1)}.png",
-                                mime="image/png",
-                                use_container_width=True,
-                                key=f"dl_btn_{i}"
-                            )
-                
-                # Data Debugging untuk Ahli Developer
-                with st.expander("🛠️ Lihat Data JSON Groq Mentah (Untuk Developer)"):
-                    clean_pages = [{k: (v if k != 'image' else ('[BASE64_IMAGE_DATA]' if v else None)) for k, v in p.items()} for p in pages]
-                    st.json(clean_pages)
+                        st.success("🎉 Infografis berhasil dirender secara utuh!")
+                        
+                        # 4. Tampilkan Gambar Final dan Tombol Download
+                        st.image(final_bytes, caption="Hasil Cetak Infografis (Teks & Gambar Menyatu)", use_container_width=True)
+                        
+                        st.download_button(
+                            label="⬇️ Download Poster Infografis (PNG)",
+                            data=final_bytes,
+                            file_name="infografis_final.png",
+                            mime="image/png",
+                            use_container_width=True,
+                            type="primary"
+                        )
+                        
+                        with st.expander("🛠️ Lihat Data Struktur Poin (JSON)"):
+                            st.json(structured_data)
 
             except Exception as e:
                 st.error(f"❌ Terjadi kesalahan pada proses generasi: {str(e)}")
 
-    # 4. NAVIGASI BAWAH
     st.divider()
     st.markdown("### 🚀 Lanjut Produksi Karya Lain")
     
