@@ -1,32 +1,29 @@
 import streamlit as st
 import re
+import os
 import json
 import requests
 import base64
 import time
-import textwrap
-import urllib.request
-from io import BytesIO
-
-# Memasukkan library pengolah gambar bawaan Python (Pillow)
-from PIL import Image, ImageDraw, ImageFont
 
 # ==========================================
 # 🧩 1. HUGGING FACE IMAGE GENERATOR (FLUX)
 # ==========================================
 def generate_image_with_retry(prompt, dimensi=""):
-    """Menggunakan model FLUX.1 yang lebih modern dan anti-error di Hugging Face."""
+    """Menggunakan model FLUX.1 dengan URL Router Hugging Face terbaru."""
     hf_key = st.secrets.get("HUGGINGFACE_API_KEY")
     if not hf_key:
         st.warning("⚠️ Kunci HUGGINGFACE_API_KEY tidak ditemukan!")
         return None
         
-    # Menggunakan FLUX.1-schnell (Sangat cepat dan realistis)
-    API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+    # PERBAIKAN: Menggunakan URL router terbaru sesuai instruksi error
+    API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
     headers = {"Authorization": f"Bearer {hf_key}"}
     
-    # Resolusi default untuk ilustrasi tengah (Kita pakai square agar mudah di-layout)
+    # Resolusi default untuk ilustrasi tengah
     w, h = 1024, 1024 
+    if "Portrait" in dimensi or "Vertical" in dimensi:
+        w, h = 896, 1152 # Proporsi vertikal agar serasi
 
     payload = {
         "inputs": prompt,
@@ -43,7 +40,7 @@ def generate_image_with_retry(prompt, dimensi=""):
                 encoded = base64.b64encode(response.content).decode('utf-8')
                 return f"data:image/png;base64,{encoded}"
             elif response.status_code == 503:
-                time.sleep(5) # Tunggu mesin pemanasan
+                time.sleep(5) 
                 continue
             else:
                 st.warning(f"⚠️ Pelukis AI Error: {response.text}")
@@ -59,7 +56,8 @@ def generate_image_with_retry(prompt, dimensi=""):
 # ==========================================
 def generate_structured_text_groq(prompt_text, opsi_slide):
     """
-    Menggunakan Groq untuk menstrukturkan data menjadi format Judul, Gambar, dan Poin-poin.
+    Menggunakan Groq untuk menstrukturkan data dengan penambahan 'icon_emoji' 
+    agar desain visualnya menyerupai poster Canva (berikon).
     """
     groq_key = st.secrets.get("GROQ_API_KEY")
     if not groq_key:
@@ -72,23 +70,25 @@ def generate_structured_text_groq(prompt_text, opsi_slide):
     }
 
     system_prompt = f"""Kamu adalah Ahli Desain Visual dan Copywriter Profesional.
-Tugasmu merangkum teks menjadi format infografis padat.
+Tugasmu merangkum teks menjadi format infografis padat bergaya modern.
 Format output HARUS JSON valid dengan struktur berikut:
 {{
   "infographic_title": "Judul Utama Poster",
-  "image_prompt": "professional illustration, clean vector, minimalist, highly detailed, [objek utama]...",
+  "image_prompt": "professional poster illustration, clean vector, minimalist, highly detailed, [objek utama]...",
   "items": [
     {{
+      "icon_emoji": "🌍",
       "title": "Sub Judul Poin 1",
       "content": "Penjelasan sangat singkat, maksimal 2 baris."
     }},
     {{
+      "icon_emoji": "🛡️",
       "title": "Sub Judul Poin 2",
       "content": "Penjelasan sangat singkat, maksimal 2 baris."
     }}
   ]
 }}
-ATURAN MUTLAK: Buat jumlah item dalam array 'items' sesuai dengan permintaan pengguna berikut: {opsi_slide}. Jika diminta '1 Slide', buatlah 4-5 poin utama agar pas di dalam satu halaman poster."""
+ATURAN MUTLAK: Buat jumlah item dalam array 'items' sesuai dengan permintaan: {opsi_slide}. Pilih satu emoji (icon_emoji) yang paling merepresentasikan setiap poin."""
 
     payload = {
         "model": "llama-3.3-70b-versatile",
@@ -109,154 +109,224 @@ ATURAN MUTLAK: Buat jumlah item dalam array 'items' sesuai dengan permintaan pen
         raise Exception(f"Gagal menghubungi Groq: {response.text}")
 
 # ==========================================
-# 🧩 3. AUTO-LAYOUT ENGINE (PILLOW POSTER MAKER)
+# 🧩 3. WEB-BASED LAYOUT ENGINE (HTML2CANVAS)
 # ==========================================
-def get_text_dimensions(draw, text, font):
-    """Fungsi pembantu dimensi font agar kompatibel dengan berbagai versi server"""
-    if hasattr(draw, 'textbbox'):
-        bbox = draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    else:
-        return draw.textsize(text, font=font)
-
-@st.cache_resource
-def load_fonts():
-    """Mengunduh font standar industri (Roboto) untuk layout"""
-    try:
-        url_bold = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Bold.ttf"
-        url_reg = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
-        
-        bold_bytes = BytesIO(urllib.request.urlopen(url_bold).read())
-        reg_bytes = BytesIO(urllib.request.urlopen(url_reg).read())
-        
-        return {
-            "title": ImageFont.truetype(bold_bytes, 60),
-            "subtitle": ImageFont.truetype(bold_bytes, 40),
-            "body": ImageFont.truetype(reg_bytes, 32)
-        }
-    except:
-        default = ImageFont.load_default()
-        return {"title": default, "subtitle": default, "body": default}
-
-def create_infographic_poster(data_json, b64_img, opsi_dimensi):
-    """Menggabungkan Ilustrasi AI dan Teks ke dalam SATU Gambar PNG."""
-    fonts = load_fonts()
+def render_beautiful_html_poster(data_json, b64_img, opsi_dimensi):
+    """
+    Membuat layout menggunakan HTML/CSS modern yang sangat estetik (berbayang, lengkung, ikon).
+    Disematkan script html2canvas untuk langsung mendownloadnya sebagai PNG.
+    """
+    # Mengatur lebar kontainer utama
+    max_width = "800px" if "Square" in opsi_dimensi else "650px"
     
-    # 1. Tentukan Lebar Kanvas berdasarkan Dimensi
-    canvas_w = 1080
-    if "Landscape" in opsi_dimensi:
-        canvas_w = 1920
-        
-    # Warna Tema (Desain Modern Bersih)
-    bg_color = (235, 245, 250) # Light blueish gray
-    card_color = (255, 255, 255)
-    text_dark = (30, 50, 70)
-    text_gray = (90, 100, 110)
-    primary_color = (20, 120, 100) # Dark Cyan
-    
-    # Kita buat kanvas super tinggi sementara, nanti di-crop sesuai isi
-    img = Image.new('RGB', (canvas_w, 4000), color=bg_color)
-    draw = ImageDraw.Draw(img)
-    
-    current_y = 80
-    
-    # 2. Cetak Judul Utama (Rata Tengah)
-    title = data_json.get("infographic_title", "Infografis Modern")
-    # Wrap teks agar tidak tumpah ke luar batas
-    wrap_width = 30 if canvas_w == 1080 else 55
-    wrapped_title = textwrap.wrap(title.upper(), width=wrap_width)
-    
-    for line in wrapped_title:
-        tw, th = get_text_dimensions(draw, line, fonts["title"])
-        x_pos = (canvas_w - tw) // 2
-        draw.text((x_pos, current_y), line, font=fonts["title"], fill=primary_color)
-        current_y += th + 15
-    current_y += 50
-    
-    # 3. Cetak dan Tempel Ilustrasi dari Hugging Face
+    # 1. Menyiapkan Gambar Utama
+    img_element = ""
     if b64_img:
-        try:
-            img_data = base64.b64decode(b64_img.split(",")[1])
-            hf_image = Image.open(BytesIO(img_data)).convert("RGBA")
-            
-            # Hitung skala ukuran gambar (Lebar max 800px)
-            target_w = 800 if canvas_w == 1080 else 1000
-            ratio = target_w / hf_image.width
-            target_h = int(hf_image.height * ratio)
-            hf_image = hf_image.resize((target_w, target_h), Image.Resampling.LANCZOS)
-            
-            # Buat sudut melengkung pada ilustrasi
-            mask = Image.new('L', (target_w, target_h), 0)
-            draw_mask = ImageDraw.Draw(mask)
-            draw_mask.rounded_rectangle((0, 0, target_w, target_h), radius=40, fill=255)
-            
-            img.paste(hf_image, ((canvas_w - target_w) // 2, current_y), mask)
-            current_y += target_h + 80
-        except Exception as e:
-            print(f"Error pasting image: {e}")
-            
-    # 4. Cetak Kartu-Kartu Poin (Teks Keterangan)
-    items = data_json.get("items", [])
-    box_x = 80 if canvas_w == 1080 else 200
-    box_w = canvas_w - (box_x * 2)
-    
-    for idx, item in enumerate(items):
-        item_title = f"{idx+1}. {item.get('title', '')}"
-        item_content = item.get('content', '')
+        img_element = f'<img src="{b64_img}" class="hero-image" alt="Ilustrasi Utama">'
         
-        wrap_tw = 40 if canvas_w == 1080 else 80
-        wrap_cw = 50 if canvas_w == 1080 else 100
+    # 2. Menyiapkan Item/Poin
+    items_html = ""
+    for item in data_json.get("items", []):
+        icon = item.get("icon_emoji", "✨")
+        title = item.get("title", "Judul Poin")
+        content = item.get("content", "Deskripsi poin.")
         
-        wrapped_ititle = textwrap.wrap(item_title, width=wrap_tw)
-        wrapped_icontent = textwrap.wrap(item_content, width=wrap_cw)
+        items_html += f"""
+        <div class="card">
+            <div class="card-icon">{icon}</div>
+            <div class="card-text">
+                <div class="card-title">{title}</div>
+                <div class="card-desc">{content}</div>
+            </div>
+        </div>
+        """
         
-        # Hitung tinggi kotak
-        box_h = 40
-        for line in wrapped_ititle:
-            tw, th = get_text_dimensions(draw, line, fonts["subtitle"])
-            box_h += th + 10
-        for line in wrapped_icontent:
-            tw, th = get_text_dimensions(draw, line, fonts["body"])
-            box_h += th + 10
+    # 3. Merakit HTML Keseluruhan dengan CSS Premium
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Nunito:wght@400;600;700&display=swap');
             
-        # Gambar kotak putih membulat
-        draw.rounded_rectangle([box_x, current_y, box_x + box_w, current_y + box_h], 
-                               radius=25, fill=card_color, outline=(200, 220, 230), width=4)
-        
-        # Cetak Teks di dalam kotak
-        text_y = current_y + 25
-        for line in wrapped_ititle:
-            draw.text((box_x + 40, text_y), line, font=fonts["subtitle"], fill=text_dark)
-            tw, th = get_text_dimensions(draw, line, fonts["subtitle"])
-            text_y += th + 10
+            body {{
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: #f0f2f5;
+            }}
             
-        text_y += 10
-        for line in wrapped_icontent:
-            draw.text((box_x + 40, text_y), line, font=fonts["body"], fill=text_gray)
-            tw, th = get_text_dimensions(draw, line, fonts["body"])
-            text_y += th + 10
+            /* Kontainer Utama Poster */
+            #poster-container {{
+                background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+                width: 100%;
+                max-width: {max_width};
+                padding: 40px;
+                border-radius: 25px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+                font-family: 'Nunito', sans-serif;
+                position: relative;
+                box-sizing: border-box;
+            }}
             
-        current_y += box_h + 40 # Jarak antar kotak
-        
-    # 5. Potong kanvas memanjang agar pas (Crop)
-    final_h = current_y + 60
-    img = img.crop((0, 0, canvas_w, final_h))
-    
-    # 6. Ekspor menjadi Base64 dan Bytes
-    output = BytesIO()
-    img.save(output, format="PNG")
-    img_bytes = output.getvalue()
-    
-    encoded = base64.b64encode(img_bytes).decode('utf-8')
-    return f"data:image/png;base64,{encoded}", img_bytes
+            .header-title {{
+                font-family: 'Montserrat', sans-serif;
+                font-size: 32px;
+                color: #006064;
+                text-align: center;
+                margin-top: 0;
+                margin-bottom: 30px;
+                line-height: 1.3;
+                text-transform: uppercase;
+                text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+            }}
+            
+            .hero-image {{
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                border-radius: 20px;
+                margin: 0 auto 40px auto;
+                display: block;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+                border: 4px solid white;
+            }}
+            
+            .cards-wrapper {{
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }}
+            
+            .card {{
+                background-color: white;
+                border-radius: 15px;
+                padding: 20px;
+                display: flex;
+                align-items: center;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+                border-left: 8px solid #00acc1;
+                transition: transform 0.2s;
+            }}
+            
+            .card-icon {{
+                font-size: 45px;
+                margin-right: 20px;
+                min-width: 60px;
+                text-align: center;
+                filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1));
+            }}
+            
+            .card-title {{
+                font-family: 'Montserrat', sans-serif;
+                font-size: 18px;
+                color: #00838f;
+                margin-bottom: 6px;
+                font-weight: 700;
+            }}
+            
+            .card-desc {{
+                font-size: 15px;
+                color: #455a64;
+                line-height: 1.5;
+            }}
+            
+            /* Tombol Download */
+            .download-btn {{
+                margin-top: 30px;
+                background-color: #ff5722;
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                font-size: 18px;
+                font-family: 'Montserrat', sans-serif;
+                border-radius: 30px;
+                cursor: pointer;
+                box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4);
+                transition: background 0.3s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                width: 100%;
+                max-width: {max_width};
+            }}
+            .download-btn:hover {{
+                background-color: #e64a19;
+            }}
+            
+            .footer-note {{
+                text-align: center;
+                margin-top: 30px;
+                color: #00838f;
+                font-weight: 600;
+                font-size: 14px;
+                letter-spacing: 1px;
+            }}
+        </style>
+    </head>
+    <body>
 
+        <!-- Area Poster yang akan di-capture -->
+        <div id="poster-container">
+            <h1 class="header-title">{data_json.get("infographic_title", "Infografis Modern")}</h1>
+            
+            {img_element}
+            
+            <div class="cards-wrapper">
+                {items_html}
+            </div>
+            
+            <div class="footer-note">STUDIO KREATIF PRO • KTB UKM JATIM</div>
+        </div>
+
+        <!-- Tombol Pemicu Download -->
+        <button class="download-btn" onclick="downloadPoster()">
+            <span>⬇️</span> Download Poster Kualitas Tinggi (PNG)
+        </button>
+
+        <script>
+            function downloadPoster() {{
+                const poster = document.getElementById('poster-container');
+                const btn = document.querySelector('.download-btn');
+                
+                // Ubah teks tombol saat loading
+                btn.innerHTML = '⏳ Sedang Memproses Gambar...';
+                btn.style.backgroundColor = '#757575';
+                
+                // Menggunakan html2canvas untuk memotret div
+                html2canvas(poster, {{ scale: 2, useCORS: true }}).then(canvas => {{
+                    // Kembalikan tombol
+                    btn.innerHTML = '<span>⬇️</span> Download Poster Kualitas Tinggi (PNG)';
+                    btn.style.backgroundColor = '#ff5722';
+                    
+                    // Trigger download
+                    let link = document.createElement('a');
+                    link.download = 'Infografis_Kreatif.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                }}).catch(err => {{
+                    console.error("Gagal mendownload:", err);
+                    alert("Terjadi kesalahan saat memproses gambar.");
+                    btn.innerHTML = '<span>⬇️</span> Download Poster Kualitas Tinggi (PNG)';
+                    btn.style.backgroundColor = '#ff5722';
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return html_template
 
 # ==========================================
 # 🚀 MAIN APP RUNNER
 # ==========================================
 def run():
     st.title("🎨 Ruang 3: Studio Cetak (Visual & Infografis)")
-    st.info("💡 **Ditenagai Groq Llama & Layout Engine Khusus:** Sistem akan menyusun teks dan menggambar ilustrasi menjadi **SATU file poster PNG** utuh yang siap Anda unduh.")
+    st.info("💡 **Arsitektur Baru (Web Layout Engine):** Sistem kini menyatukan teks, ikon organik, dan lukisan AI menjadi layout estetik menyerupai poster desain profesional.")
 
     raw_text = st.session_state.get("hasil_naskah", "")
     if not raw_text:
@@ -281,8 +351,7 @@ def run():
             [
                 "Pilih...",
                 "1080 x 1920 px (Vertical / IG Story / TikTok) - DIREKOMENDASIKAN",
-                "1080 x 1080 px (Square / IG Feed)",
-                "1920 x 1080 px (Landscape / Presentasi PPT / YouTube)"
+                "1080 x 1080 px (Square / IG Feed)"
             ], index=1
         )
         
@@ -311,33 +380,25 @@ def run():
             st.warning("⚠️ Draft naskah tidak boleh kosong!")
             return
             
-        with st.spinner("🤖 Groq Llama 3.3 sedang membaca naskah dan merangkum poin-poin..."):
+        with st.spinner("🤖 Groq Llama 3.3 sedang merangkum naskah dan memilih Ikon yang tepat..."):
             try:
-                # 1. Analisis Naskah dengan Groq
+                # 1. Analisis Naskah dengan Groq (JSON Setup)
                 structured_data = generate_structured_text_groq(user_input, jawaban_slide)
                 
-                with st.spinner("🎨 AI Pelukis sedang menggambar ilustrasi utama (sekitar 15-30 detik)..."):
-                    # 2. Gambar ilustrasi
+                with st.spinner("🎨 AI Pelukis FLUX.1 sedang menggambar ilustrasi utama (Harap tunggu, mesin pemanasan sekitar 15-30 detik)..."):
+                    # 2. Gambar ilustrasi via Hugging Face Router terbaru
                     img_prompt = structured_data.get("image_prompt", "Professional vector infographic illustration")
                     b64_illustration = generate_image_with_retry(img_prompt, opsi_dimensi)
                     
-                    with st.spinner("📐 Layout Engine sedang menata letak teks dan gambar menjadi Poster PNG..."):
-                        # 3. Tata letak (Typesetting) menggunakan Python Pillow
-                        final_b64, final_bytes = create_infographic_poster(structured_data, b64_illustration, opsi_dimensi)
+                    with st.spinner("📐 Layout Web Engine sedang menata letak elemen..."):
+                        # 3. Merakit HTML/CSS Kualitas Tinggi
+                        final_html = render_beautiful_html_poster(structured_data, b64_illustration, opsi_dimensi)
                         
-                        st.success("🎉 Infografis berhasil dirender secara utuh!")
+                        st.success("🎉 Infografis berhasil dirender dengan desain memukau!")
                         
-                        # 4. Tampilkan Gambar Final dan Tombol Download
-                        st.image(final_bytes, caption="Hasil Cetak Infografis (Teks & Gambar Menyatu)", use_container_width=True)
-                        
-                        st.download_button(
-                            label="⬇️ Download Poster Infografis (PNG)",
-                            data=final_bytes,
-                            file_name="infografis_final.png",
-                            mime="image/png",
-                            use_container_width=True,
-                            type="primary"
-                        )
+                        # 4. Tampilkan HTML yang interaktif langsung ke dalam iframe Streamlit
+                        # Kita beri height tinggi agar tombol download di bawahnya tidak terpotong
+                        st.components.v1.html(final_html, height=1200, scrolling=True)
                         
                         with st.expander("🛠️ Lihat Data Struktur Poin (JSON)"):
                             st.json(structured_data)
