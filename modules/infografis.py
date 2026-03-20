@@ -71,11 +71,11 @@ def generate_structured_text_groq(prompt_text, opsi_slide, detail_topik, opsi_ga
 
     # Penentuan Gaya Gambar Konseptual Premium
     if "Realistik" in opsi_gaya:
-        style_instruction = f"ultra-realistic photography, 8k resolution, cinematic lighting, highly conceptual and creative aesthetic, [DESKRIPSI VISUAL KREATIF UNTUK '{detail_topik}'], clean premium studio aesthetic, completely textless"
-        style_rule = f"2. 'image_prompt' WAJIB FOTO REALISTIK PREMIUM. JANGAN hanya mendeskripsikan benda mati, tapi buatlah KONSEPTUAL dan KREATIF!\n- Jika topiknya Aplikasi/Software: Gambarkan model profesional yang sedang menatap tersenyum ke arah smartphone, difoto dari sudut di mana isi layarnya tidak terlihat, atau fokus pada ekspresi wajah bercahaya dari layar gadget.\n- Jika topiknya Konsep (seperti Puasa IF / Saham): Gunakan metafora visual premium. Misal: Jam weker elegan berdampingan dengan piring salad segar, atau visual grafik abstrak hijau naik ke atas tanpa angka.\n- WAJIB BERBAHASA INGGRIS."
+        style_instruction = f"ultra-realistic photography, 8k resolution, cinematic lighting, highly conceptual and creative aesthetic, [DESKRIPSI VISUAL KREATIF DAN SANGAT SPESIFIK BERDASARKAN NASKAH UNTUK '{detail_topik}'], clean premium studio aesthetic, completely textless"
+        style_rule = f"2. 'image_prompt' WAJIB FOTO REALISTIK PREMIUM. Baca isi naskah dengan saksama dan buatlah gambaran KONSEPTUAL!\n- Jika topiknya Aplikasi/Software: Gambarkan model profesional yang sedang menatap tersenyum ke arah smartphone, difoto dari sudut di mana isi layarnya tidak terlihat, atau fokus pada ekspresi wajah bercahaya dari layar gadget.\n- Jika topiknya Konsep/Barang: Gunakan metafora visual premium atau wujud aslinya. Misal: Jam weker elegan berdampingan dengan piring salad segar untuk puasa IF.\n- WAJIB BERBAHASA INGGRIS."
     else:
-        style_instruction = f"professional premium 2d vector illustration, clean lines, vibrant modern colors, highly conceptual and creative metaphor, [DESKRIPSI VISUAL KREATIF UNTUK '{detail_topik}'], completely textless"
-        style_rule = f"2. 'image_prompt' WAJIB GAYA LUKISAN VEKTOR PREMIUM. Buatlah KONSEPTUAL dan KREATIF!\n- Jika topiknya Aplikasi/Software: Gambarkan karakter manusia modern yang sedang berinteraksi seru dengan smartphone raksasa, fokus pada aksi/ekspresinya, BUKAN pada tulisan antarmukanya.\n- Jika topiknya Konsep (seperti Puasa IF / Saham): Gunakan metafora cerdas. Misal: ilustrasi jam pasir dengan sayuran, atau roket meluncur ke atas sebagai metafora saham.\n- WAJIB BERBAHASA INGGRIS."
+        style_instruction = f"professional premium 2d vector illustration, clean lines, vibrant modern colors, highly conceptual and creative metaphor, [DESKRIPSI VISUAL KREATIF DAN SANGAT SPESIFIK BERDASARKAN NASKAH UNTUK '{detail_topik}'], completely textless"
+        style_rule = f"2. 'image_prompt' WAJIB GAYA LUKISAN VEKTOR PREMIUM. Baca isi naskah dan buatlah gambaran KONSEPTUAL!\n- Jika topiknya Aplikasi/Software: Gambarkan karakter manusia modern yang sedang berinteraksi seru dengan smartphone raksasa, fokus pada aksi/ekspresinya, BUKAN pada tulisan antarmukanya.\n- Jika topiknya Konsep/Barang: Gunakan metafora cerdas. Misal: ilustrasi jam pasir dengan sayuran, atau roket meluncur ke atas sebagai metafora saham.\n- WAJIB BERBAHASA INGGRIS."
 
     # Penentuan Kepadatan Teks Khusus 1 Slide
     slide_rule = ""
@@ -462,6 +462,11 @@ def run():
 
     user_input = st.text_area("Draft Naskah Dasar:", value=naskah_final, height=150)
 
+    # --- FITUR BARU: UPLOAD GAMBAR MANUAL ---
+    st.markdown("### 📸 Gambar Produk Asli (Opsional)")
+    st.info("💡 **Tips Cerdas:** Punya foto produk atau screenshot aplikasi sendiri? Upload di sini! AI tidak perlu lagi menebak-nebak, dan gambar Anda akan langsung dimasukkan ke dalam poster dengan bingkai membulat yang sangat elegan.")
+    uploaded_file = st.file_uploader("Upload Foto Asli Anda di sini (Format: PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
+
     if st.button("✨ Hasilkan Poster Konseptual", use_container_width=True, type="primary"):
         if not jawaban_slide.strip():
             st.warning("⚠️ Mohon lengkapi Mode Format terlebih dahulu!")
@@ -473,6 +478,14 @@ def run():
             
         with st.spinner("🤖 Art Director AI sedang merancang metafora visual yang kreatif..."):
             try:
+                # 0. Proses Gambar Upload jika ada
+                user_b64_img = ""
+                if uploaded_file is not None:
+                    img_bytes = uploaded_file.getvalue()
+                    b64_encoded = base64.b64encode(img_bytes).decode('utf-8')
+                    mime_type = uploaded_file.type
+                    user_b64_img = f"data:{mime_type};base64,{b64_encoded}"
+
                 # Menarik konteks produk
                 produk_name = st.session_state.jawaban.get("produk", "Produk Utama")
                 merk_name = st.session_state.jawaban.get("merk", "")
@@ -485,25 +498,32 @@ def run():
                 
                 b64_images = []
                 
-                # 2. Looping Gambar AI
+                # 2. Looping Gambar AI atau Gunakan Gambar Manual
                 for idx, slide in enumerate(slides):
                     slide_num = slide.get("slide_number", idx + 1)
                     
-                    # MENDAPATKAN BASE PROMPT DARI GROQ
-                    base_prompt = slide.get("image_prompt", f"ultra-realistic photography conceptual metaphor for {detail_topik}")
-                    
-                    # LAPISAN KEAMANAN TERAKHIR
-                    safe_prompt = f"{base_prompt}, completely textless, no letters, no words, no numbers, clean surface"
-                    
-                    with st.spinner(f"📸 Pelukis AI FLUX.1 sedang memproduksi visual untuk Slide {slide_num} dari {total_slides} (Harap tunggu)..."):
-                        b64_img = generate_image_with_retry(safe_prompt, opsi_dimensi)
-                        b64_images.append(b64_img)
+                    if user_b64_img:
+                        # BYPASS HUGGING FACE: Langsung pakai foto dari pengguna untuk semua slide
+                        b64_images.append(user_b64_img)
+                    else:
+                        # MENDAPATKAN BASE PROMPT DARI GROQ
+                        base_prompt = slide.get("image_prompt", f"ultra-realistic photography conceptual metaphor for {detail_topik}")
+                        
+                        # LAPISAN KEAMANAN TERAKHIR
+                        safe_prompt = f"{base_prompt}, completely textless, no letters, no words, no numbers, clean surface"
+                        
+                        with st.spinner(f"📸 Pelukis AI FLUX.1 sedang memproduksi visual untuk Slide {slide_num} dari {total_slides} (Harap tunggu)..."):
+                            b64_img = generate_image_with_retry(safe_prompt, opsi_dimensi)
+                            b64_images.append(b64_img)
                 
                 with st.spinner("📐 Web Layout Engine sedang merakit Poster Resolusi Tinggi..."):
                     # 3. Merakit HTML/CSS Kualitas Tinggi
                     final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi)
                     
-                    st.success(f"🎉 {total_slides} Poster Infografis berhasil dirender dengan visual konseptual premium!")
+                    if user_b64_img:
+                        st.success(f"🎉 {total_slides} Poster Infografis berhasil dirender menggunakan FOTO ASLI ANDA!")
+                    else:
+                        st.success(f"🎉 {total_slides} Poster Infografis berhasil dirender dengan visual konseptual premium!")
                     
                     # 4. Tampilkan HTML Interaktif
                     h_px = 1920 if "Vertical" in opsi_dimensi else (1080 if "Square" in opsi_dimensi else 1080)
