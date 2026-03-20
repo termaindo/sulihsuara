@@ -19,10 +19,12 @@ def generate_image_with_retry(prompt, dimensi=""):
     API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
     headers = {"Authorization": f"Bearer {hf_key}"}
     
-    # Resolusi default untuk ilustrasi tengah
+    # Resolusi disesuaikan dengan proporsi poster
     w, h = 1024, 1024 
     if "Portrait" in dimensi or "Vertical" in dimensi:
-        w, h = 896, 1152 # Proporsi vertikal
+        w, h = 896, 1152 
+    elif "Landscape" in dimensi:
+        w, h = 1152, 896
 
     payload = {
         "inputs": prompt,
@@ -52,9 +54,10 @@ def generate_image_with_retry(prompt, dimensi=""):
 # ==========================================
 # 🧩 2. GROQ Llama 3.3 70B WRAPPER
 # ==========================================
-def generate_structured_text_groq(prompt_text, opsi_slide):
+def generate_structured_text_groq(prompt_text, opsi_slide, detail_topik, opsi_gaya):
     """
-    Menggunakan Groq untuk memproduksi Multi-Slide Array.
+    Menggunakan Groq untuk memproduksi Multi-Slide Array,
+    dengan instruksi Dinamis (Realistik/Lukisan & Kepadatan Teks).
     """
     groq_key = st.secrets.get("GROQ_API_KEY")
     if not groq_key:
@@ -66,35 +69,50 @@ def generate_structured_text_groq(prompt_text, opsi_slide):
         "Content-Type": "application/json"
     }
 
-    system_prompt = f"""Kamu adalah Ahli Desain Visual dan Copywriter Profesional.
-Tugasmu memecah teks menjadi FORMAT MULTI-SLIDE infografis padat bergaya modern.
+    # Penentuan Gaya Gambar
+    if "Realistik" in opsi_gaya:
+        style_instruction = f"ultra-realistic product photography, 8k resolution, photorealistic, cinematic lighting, [DESKRIPSI FISIK BENDA NYATA DARI PRODUK '{detail_topik}'], clean minimalist studio background"
+        style_rule = f"2. Isian 'image_prompt' WAJIB FOTOGRAFI REALISTIK (BUKAN LUKISAN) dan FOKUS pada Produk Utama ({detail_topik})."
+    else:
+        style_instruction = f"professional 2d vector illustration, flat design, clean lines, vibrant colors, minimalist infographic style, [DESKRIPSI VISUAL ILUSTRASI DARI PRODUK '{detail_topik}']"
+        style_rule = f"2. Isian 'image_prompt' WAJIB GAYA LUKISAN/VEKTOR ILUSTRASI dan FOKUS pada Produk Utama ({detail_topik})."
+
+    # Penentuan Kepadatan Teks Khusus 1 Slide
+    slide_rule = ""
+    if "1 Slide" in opsi_slide:
+        slide_rule = "\n[ATURAN KHUSUS 1 SLIDE]: Pengguna meminta 1 Halaman Penuh. Kamu WAJIB merangkum teks menjadi SANGAT SINGKAT dan PADAT (Maksimal 4-5 poin utama). JANGAN gunakan kalimat panjang agar tata letak poster tidak sesak/penuh!"
+
+    system_prompt = f"""Kamu adalah Ahli Desain Visual dan Prompt Engineer Profesional.
+FOKUS UTAMA PRODUK: {detail_topik}
+
+Tugasmu memecah teks menjadi FORMAT MULTI-SLIDE infografis padat.
 Format output HARUS JSON valid dengan struktur array 'slides' berikut:
 {{
   "slides": [
     {{
       "slide_number": 1,
-      "infographic_title": "Judul Slide Utama (Maks 5 Kata)",
-      "image_prompt": "professional poster illustration, clean vector, minimalist, highly detailed, [DESKRIPSI BENDA NYATA SESUAI KONTEKS NASKAH, misal: botol sabun cair alami dengan busa / grafik saham hijau dengan koin emas]...",
+      "infographic_title": "Judul Utama (Maks 6 Kata)",
+      "image_prompt": "{style_instruction}",
       "items": [
         {{
-          "icon_emoji": "🌍",
-          "title": "Sub Judul Poin",
-          "content": "Penjelasan sangat singkat, maksimal 2 baris."
+          "icon_emoji": "💧",
+          "title": "Sub Judul",
+          "content": "Penjelasan singkat maks 2 baris."
         }}
       ]
     }}
   ]
 }}
 ATURAN MUTLAK KUALITAS: 
-1. Buat jumlah slide di dalam array "slides" TEPAT sesuai dengan permintaan pengguna berikut: {opsi_slide}. Jika diminta 3 Slide, array WAJIB berisi 3 object slide yang bersambung menceritakan naskah.
-2. Isian "image_prompt" WAJIB relevan dengan produk/topik di dalam naskah! Jangan buat objek acak.
-3. Gunakan Emoji yang relevan di tiap "icon_emoji"."""
+1. Buat jumlah slide di dalam array "slides" TEPAT sesuai permintaan: {opsi_slide}.
+{style_rule}
+3. Gunakan Emoji yang relevan di tiap "icon_emoji".{slide_rule}"""
 
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Teks Dasar yang harus diproses menjadi {opsi_slide}:\n{prompt_text}"}
+            {"role": "user", "content": f"Teks Dasar yang harus diproses:\n{prompt_text}"}
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.5
@@ -109,24 +127,27 @@ ATURAN MUTLAK KUALITAS:
         raise Exception(f"Gagal menghubungi Groq: {response.text}")
 
 # ==========================================
-# 🧩 3. WEB-BASED LAYOUT ENGINE (MULTI-SLIDE)
+# 🧩 3. WEB-BASED LAYOUT ENGINE (DISIPLIN PIKSEL)
 # ==========================================
 def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
     """
-    Merender HTML yang memuat MULTIPLE Poster (Carousel) berderet ke bawah,
-    lengkap dengan tombol download masing-masing.
+    Merender HTML dengan ukuran piksel absolut (Misal: 1080px) dan proteksi Overflow Teks.
+    Ditambah Footer Stamp Website.
     """
-    max_width = "800px" if "Square" in opsi_dimensi else "650px"
+    w_px, h_px = 1080, 1920
+    if "Square" in opsi_dimensi:
+        w_px, h_px = 1080, 1080
+    elif "Landscape" in opsi_dimensi:
+        w_px, h_px = 1920, 1080
+
     slides = data_json.get("slides", [])
-    
     all_posters_html = ""
     
-    # Looping pembuatan HTML untuk setiap slide
     for idx, slide in enumerate(slides):
         slide_num = slide.get("slide_number", idx + 1)
         b64_img = b64_images[idx] if idx < len(b64_images) else ""
         
-        img_element = f'<img src="{b64_img}" class="hero-image" alt="Ilustrasi Slide {slide_num}">' if b64_img else ""
+        img_element = f'<img src="{b64_img}" class="hero-image" alt="Visual">' if b64_img else ""
             
         items_html = ""
         for item in slide.get("items", []):
@@ -147,32 +168,46 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
         poster_id = f"poster-container-{slide_num}"
         btn_id = f"btn-{slide_num}"
         
-        # Merakit HTML Per Poster
+        if w_px > h_px:
+            layout_html = f"""
+            <div style="display: flex; gap: 50px; align-items: center; flex: 1;">
+                <div style="flex: 1;">{img_element}</div>
+                <div style="flex: 1.2;" class="cards-wrapper">{items_html}</div>
+            </div>
+            """
+        else:
+            layout_html = f"""
+            {img_element}
+            <div class="cards-wrapper">{items_html}</div>
+            """
+        
+        # Merakit HTML Per Poster dengan tambahan Website di Footer
         all_posters_html += f"""
         <div class="slide-wrapper">
             <div id="{poster_id}" class="poster-container">
                 <div class="slide-badge">SLIDE {slide_num}</div>
                 <h1 class="header-title">{slide.get("infographic_title", f"Slide {slide_num}")}</h1>
-                {img_element}
-                <div class="cards-wrapper">
-                    {items_html}
+                
+                {layout_html}
+                
+                <div class="footer-note">
+                    <div>STUDIO KREATIF PRO • KTB UKM JATIM</div>
+                    <div class="footer-url">https://ktbukm-jatim.store</div>
                 </div>
-                <div class="footer-note">STUDIO KREATIF PRO • KTB UKM JATIM</div>
             </div>
             <button id="{btn_id}" class="download-btn" onclick="downloadPoster('{poster_id}', '{btn_id}', {slide_num})">
-                <span>⬇️</span> Download Slide {slide_num} Kualitas Tinggi (PNG)
+                <span>⬇️</span> Download Slide {slide_num} (100% Resolusi Tinggi)
             </button>
         </div>
         """
 
-    # Membungkus seluruh poster ke dalam satu dokumen HTML
     html_template = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Nunito:wght@400;600;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;800&family=Nunito:wght@500;700&display=swap');
             
             body {{
                 margin: 0;
@@ -180,130 +215,151 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                background-color: #f0f2f5;
+                background-color: #eef2f5;
             }}
             
             .slide-wrapper {{
                 margin-bottom: 60px;
-                width: 100%;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                width: 100%;
+                overflow-x: auto; 
             }}
             
-            /* Kontainer Poster */
             .poster-container {{
-                background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-                width: 100%;
-                max-width: {max_width};
-                padding: 40px;
-                border-radius: 25px;
-                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+                background: linear-gradient(135deg, #f0fbff 0%, #c4f0f6 100%);
+                width: {w_px}px; 
+                min-height: {h_px}px;
+                padding: 60px 80px;
+                box-sizing: border-box;
                 font-family: 'Nunito', sans-serif;
                 position: relative;
-                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
             }}
             
             .slide-badge {{
                 position: absolute;
-                top: -15px;
-                left: -15px;
+                top: 20px;
+                left: 20px;
                 background-color: #ff5722;
                 color: white;
-                padding: 8px 20px;
-                border-radius: 20px;
+                padding: 10px 25px;
+                border-radius: 30px;
                 font-family: 'Montserrat', sans-serif;
-                font-size: 14px;
-                font-weight: bold;
-                box-shadow: 0 4px 10px rgba(255,87,34,0.3);
+                font-size: 18px;
+                font-weight: 800;
             }}
             
             .header-title {{
                 font-family: 'Montserrat', sans-serif;
-                font-size: 32px;
-                color: #006064;
+                font-size: 55px;
+                color: #004d40;
                 text-align: center;
-                margin-top: 15px;
-                margin-bottom: 30px;
-                line-height: 1.3;
+                margin-top: 20px;
+                margin-bottom: 50px;
+                line-height: 1.2;
                 text-transform: uppercase;
-                text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.05);
             }}
             
             .hero-image {{
                 width: 100%;
-                max-width: 450px;
-                height: auto;
-                border-radius: 20px;
-                margin: 0 auto 30px auto;
+                height: 550px;
+                object-fit: cover;
+                border-radius: 40px;
+                margin: 0 auto 50px auto;
                 display: block;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-                border: 4px solid white;
+                box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+                border: 10px solid white;
             }}
             
             .cards-wrapper {{
                 display: flex;
                 flex-direction: column;
-                gap: 15px;
+                gap: 25px;
+                flex: 1;
             }}
             
             .card {{
                 background-color: white;
-                border-radius: 15px;
-                padding: 20px;
+                border-radius: 25px;
+                padding: 30px 40px;
                 display: flex;
-                align-items: center;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-                border-left: 8px solid #00acc1;
+                align-items: flex-start;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+                border-left: 15px solid #00acc1;
+                height: auto;
             }}
             
             .card-icon {{
-                font-size: 40px;
-                margin-right: 20px;
-                min-width: 50px;
-                text-align: center;
+                font-size: 65px;
+                margin-right: 30px;
+                line-height: 1;
+            }}
+            
+            .card-text {{
+                flex: 1;
+                min-width: 0; 
             }}
             
             .card-title {{
                 font-family: 'Montserrat', sans-serif;
-                font-size: 18px;
+                font-size: 28px;
                 color: #00838f;
-                margin-bottom: 6px;
-                font-weight: 700;
+                margin-bottom: 10px;
+                font-weight: 800;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                white-space: normal;
+                line-height: 1.3;
             }}
             
             .card-desc {{
-                font-size: 15px;
+                font-size: 22px;
                 color: #455a64;
                 line-height: 1.5;
+                margin: 0;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
             }}
             
-            /* Tombol Download */
+            .footer-note {{
+                margin-top: auto; 
+                padding-top: 50px;
+                text-align: center;
+                color: #00838f;
+                font-weight: 800;
+                font-size: 22px;
+                letter-spacing: 2px;
+                font-family: 'Montserrat', sans-serif;
+            }}
+            
+            /* Penambahan style khusus URL */
+            .footer-url {{
+                font-size: 18px;
+                font-weight: 500;
+                margin-top: 8px;
+                letter-spacing: 1px;
+                color: #00acc1;
+            }}
+
             .download-btn {{
                 margin-top: 25px;
                 background-color: #ff5722;
                 color: white;
                 border: none;
-                padding: 15px 30px;
-                font-size: 18px;
+                padding: 20px 40px;
+                font-size: 20px;
                 font-family: 'Montserrat', sans-serif;
-                border-radius: 30px;
+                border-radius: 40px;
                 cursor: pointer;
-                box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4);
+                box-shadow: 0 8px 20px rgba(255, 87, 34, 0.4);
                 transition: background 0.3s;
-                width: 100%;
-                max-width: {max_width};
+                font-weight: bold;
             }}
             .download-btn:hover {{ background-color: #e64a19; }}
-            
-            .footer-note {{
-                text-align: center;
-                margin-top: 30px;
-                color: #00838f;
-                font-weight: 600;
-                font-size: 14px;
-                letter-spacing: 1px;
-            }}
         </style>
     </head>
     <body>
@@ -315,28 +371,27 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
                 const poster = document.getElementById(posterId);
                 const btn = document.getElementById(btnId);
                 
-                // Matikan sementara lencana Slide saat dicapture agar hasil download lebih bersih
                 const badge = poster.querySelector('.slide-badge');
                 if(badge) badge.style.display = 'none';
                 
-                btn.innerHTML = '⏳ Sedang Memproses...';
+                btn.innerHTML = '⏳ Sedang Memproses Resolusi Tinggi...';
                 btn.style.backgroundColor = '#757575';
                 
-                html2canvas(poster, {{ scale: 2, useCORS: true }}).then(canvas => {{
-                    if(badge) badge.style.display = 'block'; // Kembalikan lencana
+                html2canvas(poster, {{ scale: 1, useCORS: true, backgroundColor: null }}).then(canvas => {{
+                    if(badge) badge.style.display = 'block'; 
                     
-                    btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum + ' Kualitas Tinggi (PNG)';
+                    btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum + ' (100% Resolusi Tinggi)';
                     btn.style.backgroundColor = '#ff5722';
                     
                     let link = document.createElement('a');
-                    link.download = 'Infografis_Slide_' + slideNum + '.png';
+                    link.download = 'Infografis_Kreatif_' + slideNum + '.png';
                     link.href = canvas.toDataURL('image/png');
                     link.click();
                 }}).catch(err => {{
                     if(badge) badge.style.display = 'block';
                     console.error("Gagal mendownload:", err);
-                    alert("Terjadi kesalahan saat memproses gambar.");
-                    btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum + ' Kualitas Tinggi (PNG)';
+                    alert("Terjadi kesalahan sistem saat memproses gambar.");
+                    btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum;
                     btn.style.backgroundColor = '#ff5722';
                 }});
             }}
@@ -351,7 +406,7 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
 # ==========================================
 def run():
     st.title("🎨 Ruang 3: Studio Cetak (Visual & Infografis)")
-    st.info("💡 **Ditenagai Groq Llama 3.3 70B & Hugging Face:** Sistem kini mendukung pembuatan **Multi-Slide Carousel** (lebih dari 1 gambar) yang menyatukan teks dan ilustrasi relevan!")
+    st.info("💡 **Ditenagai Groq Llama 3.3 70B & Hugging Face:** Desain kini dibekali **Pilihan Gaya Visual** dan pengaturan pemadatan teks otomatis untuk hasil profesional yang lebih memukau.")
 
     raw_text = st.session_state.get("hasil_naskah", "")
     if not raw_text:
@@ -375,16 +430,24 @@ def run():
             "1. Ukuran Poster / Platform:", 
             [
                 "1080 x 1920 px (Vertical / IG Story / TikTok) - DIREKOMENDASIKAN",
-                "1080 x 1080 px (Square / IG Feed)"
+                "1080 x 1080 px (Square / IG Feed)",
+                "1920 x 1080 px (Landscape / Presentasi PPT / YouTube)"
+            ], index=0
+        )
+        
+        opsi_gaya = st.selectbox(
+            "2. Gaya Visual / Ilustrasi:",
+            [
+                "📸 Gaya Foto Realistik (Nyata & Profesional)",
+                "🎨 Gaya Lukisan (Vektor / Ilustrasi Digital)"
             ], index=0
         )
         
     with col2:
-        # Pilihan langsung untuk mempermudah, opsi custom ditaruh di bawah
         opsi_slide = st.selectbox(
-            "2. Mode Format Poster:", 
+            "3. Mode Format Poster:", 
             [
-                "1 Slide (1 Poster Panjang)", 
+                "1 Slide (1 Poster Panjang, Teks Sangat Padat)", 
                 "2 Slide (Carousel Pendek)",
                 "3 Slide (Carousel Menengah)",
                 "5 Slide (Carousel Panjang)",
@@ -398,7 +461,7 @@ def run():
 
     user_input = st.text_area("Draft Naskah Dasar:", value=naskah_final, height=150)
 
-    if st.button("✨ Hasilkan Infografis Cerdas", use_container_width=True, type="primary"):
+    if st.button("✨ Hasilkan Poster Berkualitas", use_container_width=True, type="primary"):
         if not jawaban_slide.strip():
             st.warning("⚠️ Mohon lengkapi Mode Format terlebih dahulu!")
             return
@@ -407,33 +470,41 @@ def run():
             st.warning("⚠️ Draft naskah tidak boleh kosong!")
             return
             
-        with st.spinner("🤖 Groq Llama 3.3 sedang merangkum naskah menjadi Slide presentasi..."):
+        with st.spinner("🤖 Groq Llama 3.3 sedang menstrukturkan desain presentasi..."):
             try:
-                # 1. Analisis Naskah dengan Groq (JSON Setup)
-                structured_data = generate_structured_text_groq(user_input, jawaban_slide)
+                # Menarik konteks produk
+                produk_name = st.session_state.jawaban.get("produk", "Produk Utama")
+                merk_name = st.session_state.jawaban.get("merk", "")
+                detail_topik = f"{merk_name} {produk_name}".strip()
+                
+                # 1. Analisis Naskah dengan Groq (JSON Setup dengan Mode Gaya & 1 Slide Padat)
+                structured_data = generate_structured_text_groq(user_input, jawaban_slide, detail_topik, opsi_gaya)
                 slides = structured_data.get("slides", [])
                 total_slides = len(slides)
                 
                 b64_images = []
                 
-                # 2. Looping Gambar Ilustrasi untuk SETIAP Slide
+                # 2. Looping Gambar AI
                 for idx, slide in enumerate(slides):
                     slide_num = slide.get("slide_number", idx + 1)
-                    img_prompt = slide.get("image_prompt", "Professional vector infographic illustration")
                     
-                    with st.spinner(f"🎨 AI Pelukis FLUX.1 sedang menggambar ilustrasi untuk Slide {slide_num} dari {total_slides} (Harap tunggu)..."):
+                    # Fallback jika image_prompt kosong
+                    img_prompt = slide.get("image_prompt", f"ultra-realistic product photography of {detail_topik}")
+                    
+                    with st.spinner(f"📸 Pelukis AI FLUX.1 sedang memproduksi visual untuk Slide {slide_num} dari {total_slides} (Harap tunggu)..."):
                         b64_img = generate_image_with_retry(img_prompt, opsi_dimensi)
                         b64_images.append(b64_img)
                 
-                with st.spinner("📐 Layout Web Engine sedang menata letak elemen HTML..."):
+                with st.spinner("📐 Web Layout Engine sedang merakit Poster Resolusi Tinggi..."):
                     # 3. Merakit HTML/CSS Kualitas Tinggi
                     final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi)
                     
-                    st.success(f"🎉 {total_slides} Slide Infografis berhasil dirender dengan desain memukau!")
+                    st.success(f"🎉 {total_slides} Poster Infografis berhasil dirender dengan desain luar biasa!")
                     
-                    # 4. Tampilkan HTML yang interaktif langsung ke dalam iframe Streamlit
-                    # Kita set height dinamis berdasarkan jumlah slide agar bisa di-scroll dengan lega
-                    iframe_height = total_slides * 1000 + 200
+                    # 4. Tampilkan HTML Interaktif
+                    h_px = 1920 if "Vertical" in opsi_dimensi else (1080 if "Square" in opsi_dimensi else 1080)
+                    iframe_height = total_slides * (h_px + 200)
+                    
                     st.components.v1.html(final_html, height=iframe_height, scrolling=True)
                     
                     with st.expander("🛠️ Lihat Data Struktur Poin (JSON)"):
