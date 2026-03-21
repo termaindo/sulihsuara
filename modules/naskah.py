@@ -43,6 +43,9 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
         st.stop()
 
     st.title("📝 Ruang 1: Studio Kreasi Naskah")
+    
+    # Blok informasi pengantar fungsi studio
+    st.info("💡 **Informasi:** Studio ini adalah titik awal produksi Anda. Di sini, Kecerdasan Buatan (AI) bertindak sebagai Direktur Kreatif yang akan membantu Anda menyusun naskah, skrip, atau *copywriting* profesional hanya dengan menjawab beberapa pertanyaan sederhana. Hasil dari studio ini akan otomatis tersambung ke studio lainnya.")
 
     # --- 4. INISIALISASI STATE (WIZARD) ---
     if "wizard_step" not in st.session_state:
@@ -354,10 +357,12 @@ PENTING: Pastikan teks di dalam kotak naskah final benar-benar bersih, rapi, dan
                     st.session_state.wizard_step = 1
                     st.rerun()
             with col2:
+                # Menggunakan penamaan baku
                 if st.button("🎨 Ke Studio Kreasi Cetak / Visual", use_container_width=True):
                     st.session_state.menu_aktif = "3. Studio Kreasi Cetak / Visual"
                     st.rerun()
             with col3:
+                # Menggunakan penamaan baku
                 if st.button("🚀 Ke Studio Kreasi Suara / Audio", use_container_width=True):
                     st.session_state.menu_aktif = "2. Studio Kreasi Suara / Audio"
                     st.rerun()
