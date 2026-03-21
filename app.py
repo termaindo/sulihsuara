@@ -1,44 +1,63 @@
 import streamlit as st
-from modules import naskah, vo, infografis
 
-st.set_page_config(page_title="Studio Kreatif Pro", page_icon="✨", layout="wide")
+# Mengimpor modul dari dalam folder 'modules'
+from modules import naskah
+from modules import vo
+from modules import infografis
 
-# Header Utama Aplikasi
-st.markdown("<h2 style='text-align: center; color: #1E88E5;'>✨ Studio Kreatif Pro</h2>", unsafe_allow_html=True)
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="Studio Kreatif Pro", page_icon="🎙️", layout="wide")
 
-# 1. DAFTAR NAMA MENU STANDAR (MUTLAK)
-daftar_menu = [
-    "1. Studio Kreasi Naskah", 
-    "2. Studio Kreasi Suara / Audio", 
-    "3. Studio Kreasi Cetak / Visual"
-]
+# --- INISIALISASI STATE ---
+if 'nama_pengguna' not in st.session_state:
+    st.session_state.nama_pengguna = ""
+if 'menu_aktif' not in st.session_state:
+    st.session_state.menu_aktif = "Home"
 
-# 2. SOLUSI ANTI-ERROR (VALUE ERROR FIX)
-# Jika memori browser masih menyimpan nama menu versi lama, 
-# sistem akan mendeteksinya dan otomatis mereset ke menu pertama agar tidak crash.
-if "menu_aktif" not in st.session_state or st.session_state.menu_aktif not in daftar_menu:
-    st.session_state.menu_aktif = daftar_menu[0]
+# --- HALAMAN PENYAPAAN (LOGIN NAMA) ---
+if st.session_state.nama_pengguna == "":
+    st.title("🎙️ Selamat Datang di Studio Kreatif Pro")
+    st.markdown("Sebelum kita mulai memproduksi naskah dan rekaman yang memukau, bolehkah saya tahu dengan siapa saya berinteraksi?")
+    
+    with st.form("form_nama"):
+        nama_input = st.text_input("Masukkan Nama Anda:", placeholder="Contoh: Bapak Rudi")
+        submit_nama = st.form_submit_button("Masuk ke Studio ➡️")
+        
+        if submit_nama:
+            if nama_input.strip() != "":
+                st.session_state.nama_pengguna = nama_input.strip()
+                st.rerun()
+            else:
+                st.warning("Mohon isi nama Anda terlebih dahulu untuk melanjutkan.")
+    st.stop() # Hentikan eksekusi kode di bawahnya sampai nama diisi
 
-# 3. MENU MENDATAR / HORIZONTAL (TANPA SIDEBAR SAMA SEKALI)
-st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-menu = st.radio(
-    "Pilih Ruang Kerja:",
-    options=daftar_menu,
-    index=daftar_menu.index(st.session_state.menu_aktif),
-    horizontal=True,
-    label_visibility="collapsed" # Menyembunyikan judul radio button agar tampilannya bersih
-)
-st.markdown("</div>", unsafe_allow_html=True)
+# --- HEADER & NAVIGASI HALAMAN UTAMA ---
+st.title("🎙️ Studio Kreatif Pro")
+st.markdown(f"Halo, sobat **{st.session_state.nama_pengguna}**! Pilih ruangan kerja Anda di bawah ini:")
+
+# Membuat 3 tombol sejajar sebagai menu utama (Tanpa Sidebar)
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    # Memakai penamaan baku secara ketat
+    if st.button("📝 Ruang 1: Studio Kreasi Naskah", use_container_width=True):
+        st.session_state.menu_aktif = "1. Studio Kreasi Naskah"
+with col2:
+    if st.button("🚀 Ruang 2: Studio Kreasi Suara / Audio", use_container_width=True):
+        st.session_state.menu_aktif = "2. Studio Kreasi Suara / Audio"
+with col3:
+    if st.button("🎨 Ruang 3: Studio Kreasi Cetak / Visual", use_container_width=True):
+        st.session_state.menu_aktif = "3. Studio Kreasi Cetak / Visual"
 
 st.divider()
 
-# Simpan pilihan menu yang sedang aktif
-st.session_state.menu_aktif = menu
-
-# 4. PENGALIHAN (ROUTING) KE MASING-MASING STUDIO
-if menu == "1. Studio Kreasi Naskah":
+# --- ROUTING MENU (PENGARAHAN KE MODUL) ---
+# Menggunakan penamaan baku agar sinkron dengan navigasi antar-ruangan
+if st.session_state.menu_aktif == "1. Studio Kreasi Naskah":
     naskah.run()
-elif menu == "2. Studio Kreasi Suara / Audio":
+elif st.session_state.menu_aktif == "2. Studio Kreasi Suara / Audio":
     vo.run()
-elif menu == "3. Studio Kreasi Cetak / Visual":
+elif st.session_state.menu_aktif == "3. Studio Kreasi Cetak / Visual":
     infografis.run()
+else:
+    st.info("👈 Silakan pilih ruangan kerja di atas untuk memulai produksi Anda.")
