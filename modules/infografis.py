@@ -63,7 +63,7 @@ def generate_image_with_retry(prompt, dimensi=""):
 # 🧩 2. GROQ Llama 3.3 70B WRAPPER
 # ==========================================
 def generate_structured_text_groq(prompt_text, opsi_slide, detail_topik, opsi_gaya):
-    """Menggunakan Groq untuk memproduksi Multi-Slide Array."""
+    """Menggunakan Groq untuk memproduksi Multi-Slide Array dengan Error Handling Khusus."""
     groq_key = st.secrets.get("GROQ_API_KEY")
     if not groq_key:
         raise Exception("GROQ_API_KEY tidak ditemukan di st.secrets!")
@@ -127,9 +127,19 @@ ATURAN MUTLAK KUALITAS VISUAL PREMIUM:
     if response.status_code == 200:
         result = response.json()
         content_str = result["choices"][0]["message"]["content"]
-        return json.loads(content_str)
+        
+        # Penanganan Error Parsing JSON yang lebih canggih dan anti-crash
+        try:
+            return json.loads(content_str)
+        except Exception:
+            try:
+                # Membersihkan teks dari markdown formatting jika Groq melanggar aturan JSON murni
+                clean_str = content_str.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_str)
+            except Exception:
+                raise Exception("FORMAT_JSON_RUSAK")
     else:
-        raise Exception(f"Gagal menghubungi Groq: {response.text}")
+        raise Exception(f"API_ERROR: {response.text}")
 
 # ==========================================
 # 🧩 3. WEB-BASED LAYOUT ENGINE (DISIPLIN PIKSEL)
@@ -396,8 +406,18 @@ def run():
                     
                     st.components.v1.html(final_html, height=iframe_height, scrolling=True)
 
+            # --- ERROR HANDLING PROFESIONAL ---
             except Exception as e:
-                st.error(f"❌ Terjadi kesalahan pada proses generasi: {str(e)}")
+                error_msg = str(e)
+                if "FORMAT_JSON_RUSAK" in error_msg or "Expecting value" in error_msg:
+                    st.error("⏳ **Mesin AI Sedang Sibuk (Overload):** Server Groq sedang mengalami antrean padat sehingga respons terpotong di tengah jalan. Silakan klik tombol **Hasilkan Poster Berkualitas** sekali lagi.")
+                elif "API_ERROR" in error_msg or "429" in error_msg:
+                    st.error("⏳ **Kuota Server Penuh:** Layanan AI mencapai batas maksimal permintaan sesaat. Mohon tunggu beberapa detik sebelum mencoba kembali.")
+                else:
+                    st.error("❌ **Terjadi Gangguan Komunikasi dengan Server AI.** Silakan coba kembali dalam beberapa saat.")
+                    # Menyembunyikan error teknis di dalam expander khusus
+                    with st.expander("🛠️ Lihat Detail Teknis (Untuk Developer)"):
+                        st.code(error_msg)
 
     st.divider()
     st.markdown("### 🚀 Lanjut Produksi Karya Lain")
