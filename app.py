@@ -1,62 +1,33 @@
 import streamlit as st
+from modules import naskah, vo, infografis
 
-# Mengimpor modul dari dalam folder 'modules'
-from modules import naskah
-from modules import vo
-from modules import infografis
+st.set_page_config(page_title="Studio Kreatif Pro", page_icon="✨", layout="wide")
 
-# --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Studio Kreatif Pro", page_icon="🎙️", layout="wide")
+# Set menu default ke Studio Kreasi Naskah
+if "menu_aktif" not in st.session_state:
+    st.session_state.menu_aktif = "1. Studio Kreasi Naskah"
 
-# --- INISIALISASI STATE ---
-if 'nama_pengguna' not in st.session_state:
-    st.session_state.nama_pengguna = ""
-if 'menu_aktif' not in st.session_state:
-    st.session_state.menu_aktif = "Home"
+st.sidebar.title("✨ Menu Navigasi")
 
-# --- HALAMAN PENYAPAAN (LOGIN NAMA) ---
-if st.session_state.nama_pengguna == "":
-    st.title("🎙️ Selamat Datang di Studio Kreatif Pro")
-    st.markdown("Sebelum kita mulai memproduksi naskah dan rekaman yang memukau, bolehkah saya tahu dengan siapa saya berinteraksi?")
-    
-    with st.form("form_nama"):
-        nama_input = st.text_input("Masukkan Nama Anda:", placeholder="Contoh: Bapak Rudi")
-        submit_nama = st.form_submit_button("Masuk ke Studio ➡️")
-        
-        if submit_nama:
-            if nama_input.strip() != "":
-                st.session_state.nama_pengguna = nama_input.strip()
-                st.rerun()
-            else:
-                st.warning("Mohon isi nama Anda terlebih dahulu untuk melanjutkan.")
-    st.stop() # Hentikan eksekusi kode di bawahnya sampai nama diisi
+# Membuat daftar menu standar baru yang telah dipatenkan
+daftar_menu = [
+    "1. Studio Kreasi Naskah", 
+    "2. Studio Kreasi Suara / Audio", 
+    "3. Studio Kreasi Cetak / Visual"
+]
 
-# --- HEADER & NAVIGASI HALAMAN UTAMA ---
-st.title("🎙️ Studio Kreatif Pro")
-st.markdown(f"Halo, sobat **{st.session_state.nama_pengguna}**! Pilih ruangan kerja Anda di bawah ini:")
+menu = st.sidebar.radio(
+    "Pilih Ruang Kerja:",
+    daftar_menu,
+    index=daftar_menu.index(st.session_state.menu_aktif)
+)
 
-# Membuat 3 tombol sejajar sebagai menu utama
-col1, col2, col3 = st.columns(3)
+st.session_state.menu_aktif = menu
 
-with col1:
-    # Teks tombol diubah, tapi nilai memorinya tetap menggunakan nama kunci yang asli
-    if st.button("📝 Ruang 1: Studio Kreasi Naskah", use_container_width=True):
-        st.session_state.menu_aktif = "1. Ruang Naskah"
-with col2:
-    if st.button("🚀 Ruang 2: Studio Kreasi Suara/Audio", use_container_width=True):
-        st.session_state.menu_aktif = "2. Studio Rekaman"
-with col3:
-    if st.button("🎨 Ruang 3: Studio Kreasi Cetak/Visual", use_container_width=True):
-        st.session_state.menu_aktif = "3. Studio Cetak"
-
-st.divider()
-
-# --- ROUTING MENU (PENGARAHAN KE MODUL) ---
-if st.session_state.menu_aktif == "1. Ruang Naskah":
+# Pengalihan (Routing) berdasarkan nama baru
+if menu == "1. Studio Kreasi Naskah":
     naskah.run()
-elif st.session_state.menu_aktif == "2. Studio Rekaman":
+elif menu == "2. Studio Kreasi Suara / Audio":
     vo.run()
-elif st.session_state.menu_aktif == "3. Studio Cetak":
+elif menu == "3. Studio Kreasi Cetak / Visual":
     infografis.run()
-else:
-    st.info("👈 Silakan pilih ruangan kerja di atas untuk memulai produksi Anda.")
