@@ -192,7 +192,13 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
                 
                 <div class="footer-note">
                     <div>STUDIO KREATIF PRO • KTB UKM JATIM</div>
-                    <div class="footer-url">https://ktbukm-jatim.store</div>
+                    <div class="footer-social">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="social-icon"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        <span>@ktbukm.jatim</span>
+                        <span class="social-divider">•</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="social-icon"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                        <span>https://ktbukm-jatim.store</span>
+                    </div>
                 </div>
             </div>
             <button id="{btn_id}" class="download-btn" onclick="downloadPoster('{poster_id}', '{btn_id}', {slide_num})">
@@ -221,7 +227,9 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
             .card-title {{ font-family: 'Montserrat', sans-serif; font-size: 28px; color: #00838f; margin-bottom: 10px; font-weight: 800; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; line-height: 1.3; }}
             .card-desc {{ font-size: 22px; color: #455a64; line-height: 1.5; margin: 0; word-wrap: break-word; overflow-wrap: break-word; }}
             .footer-note {{ margin-top: auto; padding-top: 50px; text-align: center; color: #00838f; font-weight: 800; font-size: 22px; letter-spacing: 2px; font-family: 'Montserrat', sans-serif; }}
-            .footer-url {{ font-size: 18px; font-weight: 500; margin-top: 8px; letter-spacing: 1px; color: #00acc1; }}
+            .footer-social {{ display: flex; justify-content: center; align-items: center; margin-top: 10px; font-size: 22px; font-weight: 800; letter-spacing: 1px; color: #00838f; }}
+            .social-icon {{ margin-right: 6px; }}
+            .social-divider {{ margin: 0 15px; color: #00838f; }}
             .download-btn {{ margin-top: 25px; background-color: #ff5722; color: white; border: none; padding: 20px 40px; font-size: 20px; font-family: 'Montserrat', sans-serif; border-radius: 40px; cursor: pointer; box-shadow: 0 8px 20px rgba(255, 87, 34, 0.4); font-weight: bold; }}
             .download-btn:hover {{ background-color: #e64a19; }}
         </style>
