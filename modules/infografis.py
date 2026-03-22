@@ -2,148 +2,94 @@ import streamlit as st
 import re
 import os
 import json
-import requests
 import base64
-import time
+import io
+import google.generativeai as genai
+from PIL import Image
 
 # ==========================================
-# 🧩 1. HUGGING FACE IMAGE GENERATOR (MULTI-MODEL FALLBACK)
+# 🧩 1. GOOGLE GEMINI (IMAGEN 3) IMAGE GENERATOR
 # ==========================================
-def generate_image_with_retry(prompt, dimensi=""):
-    """Menggunakan model FLUX.1. Jika gagal/sibuk, fallback ke SDXL."""
-    hf_key = st.secrets.get("HUGGINGFACE_API_KEY")
-    if not hf_key:
-        raise Exception("HUGGINGFACE_ERROR|Kunci API Hugging Face tidak ditemukan di sistem.")
-        
-    headers = {"Authorization": f"Bearer {hf_key}"}
-    
-    # Resolusi disesuaikan dengan proporsi poster
-    w, h = 1024, 1024 
-    if "Portrait" in dimensi or "Vertical" in dimensi:
-        w, h = 896, 1152 
-    elif "Landscape" in dimensi:
-        w, h = 1152, 896
+def generate_image_gemini(prompt, dimensi=""):
+    """Menggunakan Google Imagen 3 untuk produksi gambar kualitas super."""
+    try:
+        aspect_ratio = "1:1"
+        if "Portrait" in dimensi or "Vertical" in dimensi:
+            aspect_ratio = "9:16"
+        elif "Landscape" in dimensi:
+            aspect_ratio = "16:9"
 
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "width": w,
-            "height": h
-        }
-    }
-    
-    # Daftar mesin dari yang paling bagus ke mesin cadangan
-    models_to_try = [
-        "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
-        "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
-    ]
-    
-    last_error = "Unknown Error"
-    for api_url in models_to_try:
-        for attempt in range(2):
-            try:
-                response = requests.post(api_url, headers=headers, json=payload, timeout=40)
-                if response.status_code == 200:
-                    encoded = base64.b64encode(response.content).decode('utf-8')
-                    return f"data:image/png;base64,{encoded}"
-                elif response.status_code == 503:
-                    time.sleep(5) 
-                    continue
-                else:
-                    last_error = response.text
-                    break # Gagal di model ini, pindah ke model cadangan
-            except Exception as e:
-                last_error = str(e)
-                time.sleep(3)
-                continue
-                
-    # Jika semua percobaan gagal, lemparkan error bersih ke sistem utama
-    raise Exception(f"HUGGINGFACE_ERROR|{last_error}")
+        imagen = genai.ImageGenerationModel("imagen-3.0-generate-001")
+        result = imagen.generate_images(
+            prompt=prompt,
+            number_of_images=1,
+            aspect_ratio=aspect_ratio,
+            output_mime_type="image/jpeg"
+        )
+
+        if not result.images:
+            raise Exception("Gambar kosong.")
+
+        img_byte_arr = io.BytesIO()
+        result.images[0].image.save(img_byte_arr, format='JPEG')
+        encoded = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+        return f"data:image/jpeg;base64,{encoded}"
+
+    except Exception as e:
+        raise Exception("GEMINI_IMAGE_ERROR|Filter keamanan atau server penuh.")
 
 # ==========================================
-# 🧩 2. GROQ Llama 3.3 70B WRAPPER
+# 🧩 2. GOOGLE GEMINI (2.5 FLASH) JSON WRAPPER
 # ==========================================
-def generate_structured_text_groq(prompt_text, opsi_slide, detail_topik, opsi_gaya):
-    """Menggunakan Groq untuk memproduksi Multi-Slide Array dengan Error Handling Khusus."""
-    groq_key = st.secrets.get("GROQ_API_KEY")
-    if not groq_key:
-        raise Exception("GROQ_API_KEY tidak ditemukan di st.secrets!")
-
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json"
-    }
-
+def generate_structured_text_gemini(prompt_text, opsi_slide, detail_topik, opsi_gaya):
+    """Menghasilkan struktur JSON yang rapi untuk diolah ke HTML."""
     if "Realistik" in opsi_gaya:
-        style_instruction = f"ultra-realistic photography, 8k resolution, cinematic lighting, highly conceptual aesthetic, [DESKRIPSI VISUAL KREATIF UNTUK '{detail_topik}'], completely textless"
-        style_rule = f"2. 'image_prompt' WAJIB FOTO REALISTIK PREMIUM. Baca isi naskah dan buat gambaran KONSEPTUAL!\n- Jika topiknya Aplikasi: Gambarkan model profesional menatap tersenyum ke smartphone (layar tidak terlihat).\n- Jika topiknya Konsep: Gunakan metafora visual premium."
+        style_instruction = f"ultra-realistic photography, 8k resolution, cinematic lighting, conceptual aesthetic, completely textless, [KIASAN VISUAL UNTUK '{detail_topik}']"
     else:
-        style_instruction = f"professional premium 2d vector illustration, clean lines, modern colors, highly conceptual metaphor, [DESKRIPSI VISUAL KREATIF UNTUK '{detail_topik}'], completely textless"
-        style_rule = f"2. 'image_prompt' WAJIB LUKISAN VEKTOR PREMIUM. Baca naskah dan buat gambaran KONSEPTUAL!"
+        style_instruction = f"professional premium 2d vector illustration, modern colors, completely textless, [KIASAN VISUAL UNTUK '{detail_topik}']"
 
     slide_rule = ""
     if "1 Slide" in opsi_slide:
-        slide_rule = "\n[ATURAN KHUSUS 1 SLIDE]: Kamu WAJIB merangkum teks menjadi SANGAT SINGKAT dan PADAT (Maksimal 4-5 poin utama)."
+        slide_rule = "\n[ATURAN KHUSUS 1 SLIDE]: Rangkum menjadi SANGAT SINGKAT (Maks 4 poin utama)."
 
-    system_prompt = f"""Kamu adalah Ahli Desain Visual dan Prompt Engineer Profesional.
-FOKUS UTAMA MATERI: {detail_topik}
+    system_prompt = f"""Kamu adalah Ahli Desain Visual Profesional.
+TOPIK: {detail_topik}
 
-Tugasmu memecah teks menjadi FORMAT MULTI-SLIDE infografis padat.
-Format output HARUS JSON valid dengan struktur array 'slides' berikut:
+Format output HARUS JSON valid dengan struktur:
 {{
   "slides": [
     {{
       "slide_number": 1,
-      "infographic_title": "Judul Utama (Maks 6 Kata)",
+      "infographic_title": "Judul (Maks 6 Kata)",
       "image_prompt": "{style_instruction}",
       "items": [
         {{
           "icon_emoji": "💡",
           "title": "Sub Judul",
-          "content": "Penjelasan singkat maks 2 baris."
+          "content": "Penjelasan maksimal 2 baris."
         }}
       ]
     }}
   ]
 }}
-ATURAN MUTLAK KUALITAS VISUAL PREMIUM: 
-1. Buat jumlah slide TEPAT sesuai permintaan: {opsi_slide}.
-{style_rule}
-3. Gunakan Emoji yang sangat relevan di tiap "icon_emoji".{slide_rule}
-4. DILARANG KERAS menyuruh AI menggambar kata, huruf, UI aplikasi, atau papan tulis.
-5. Akhiri image_prompt dengan kata: "completely textless, clean blank surface"."""
+ATURAN MUTLAK: 
+1. Buat jumlah slide: {opsi_slide}.
+2. image_prompt WAJIB berbahasa Inggris dan merupakan KIASAN VISUAL (bukan kata medis/sensitif) agar lolos sensor AI.{slide_rule}
+3. DILARANG menyuruh AI menggambar teks/huruf pada image_prompt."""
 
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Teks Dasar:\n{prompt_text}"}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.5
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        result = response.json()
-        content_str = result["choices"][0]["message"]["content"]
-        
-        # Penanganan Error Parsing JSON yang lebih canggih dan anti-crash
-        try:
-            return json.loads(content_str)
-        except Exception:
-            try:
-                # Membersihkan teks dari markdown formatting jika Groq melanggar aturan JSON murni
-                clean_str = content_str.replace("```json", "").replace("```", "").strip()
-                return json.loads(clean_str)
-            except Exception:
-                raise Exception("FORMAT_JSON_RUSAK")
-    else:
-        raise Exception(f"API_ERROR: {response.text}")
+    try:
+        model = genai.GenerativeModel(
+            "gemini-2.5-flash",
+            system_instruction=system_prompt,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.4}
+        )
+        response = model.generate_content(f"Teks Dasar:\n{prompt_text}")
+        return json.loads(response.text)
+    except Exception as e:
+        raise Exception("FORMAT_JSON_RUSAK|Gagal memproses struktur visual.")
 
 # ==========================================
-# 🧩 3. WEB-BASED LAYOUT ENGINE (DISIPLIN PIKSEL)
+# 🧩 3. WEB-BASED LAYOUT ENGINE (HTML/CSS MINIMALIS)
 # ==========================================
 def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
     w_px, h_px = 1080, 1920
@@ -166,13 +112,12 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
             icon = item.get("icon_emoji", "✨")
             title = item.get("title", "Judul Poin")
             content = item.get("content", "Deskripsi poin.")
-            
             items_html += f"""
-            <div class="card">
-                <div class="card-icon">{icon}</div>
-                <div class="card-text">
-                    <div class="card-title">{title}</div>
-                    <div class="card-desc">{content}</div>
+            <div class="minimalist-item">
+                <div class="item-icon">{icon}</div>
+                <div class="item-text">
+                    <div class="item-title">{title}</div>
+                    <div class="item-desc">{content}</div>
                 </div>
             </div>
             """
@@ -180,40 +125,42 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
         poster_id = f"poster-container-{slide_num}"
         btn_id = f"btn-{slide_num}"
         
+        # Penyesuaian layout minimalis
         if w_px > h_px:
             layout_html = f"""
-            <div style="display: flex; gap: 50px; align-items: center; flex: 1;">
-                <div style="flex: 1;">{img_element}</div>
-                <div style="flex: 1.2;" class="cards-wrapper">{items_html}</div>
+            <div class="content-row">
+                <div class="image-col">{img_element}</div>
+                <div class="text-col">{items_html}</div>
             </div>
             """
         else:
             layout_html = f"""
             {img_element}
-            <div class="cards-wrapper">{items_html}</div>
+            <div class="text-col-vertical">{items_html}</div>
             """
         
         all_posters_html += f"""
         <div class="slide-wrapper">
             <div id="{poster_id}" class="poster-container">
-                <div class="slide-badge">SLIDE {slide_num}</div>
-                <h1 class="header-title">{slide.get("infographic_title", f"Slide {slide_num}")}</h1>
+                <div class="poster-body">
+                    <div class="slide-indicator">SLIDE {slide_num}</div>
+                    <h1 class="main-title">{slide.get("infographic_title", f"Slide {slide_num}")}</h1>
+                    {layout_html}
+                </div>
                 
-                {layout_html}
-                
-                <div class="footer-note">
-                    <div>STUDIO KREATIF PRO • KTB UKM JATIM</div>
-                    <div class="footer-social">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="social-icon"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-                        <span>@ktbukm.jatim</span>
-                        <span class="social-divider">•</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="social-icon"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                        <span>https://ktbukm-jatim.store</span>
+                <div class="stamp-footer">
+                    <div class="stamp-line">Studio Kreatif Pro - KTB UKM JATIM</div>
+                    <div class="stamp-line">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="stamp-icon"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        @ktbukm.jatim
+                        <span class="stamp-spacer">&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="stamp-icon"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                        https://ktbukm-jatim.store
                     </div>
                 </div>
             </div>
             <button id="{btn_id}" class="download-btn" onclick="downloadPoster('{poster_id}', '{btn_id}', {slide_num})">
-                <span>⬇️</span> Download Slide {slide_num} (Resolusi Tinggi)
+                <span>⬇️</span> Download Slide {slide_num} (Kualitas Tinggi)
             </button>
         </div>
         """
@@ -223,26 +170,32 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
     <html>
     <head>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;800&family=Nunito:wght@500;700&display=swap');
-            body {{ margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; background-color: #eef2f5; }}
-            .slide-wrapper {{ margin-bottom: 60px; display: flex; flex-direction: column; align-items: center; width: 100%; overflow-x: auto; }}
-            .poster-container {{ background: linear-gradient(135deg, #f0fbff 0%, #c4f0f6 100%); width: {w_px}px; min-height: {h_px}px; padding: 60px 80px; box-sizing: border-box; font-family: 'Nunito', sans-serif; position: relative; display: flex; flex-direction: column; }}
-            .slide-badge {{ position: absolute; top: 20px; left: 20px; background-color: #ff5722; color: white; padding: 10px 25px; border-radius: 30px; font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 800; }}
-            .header-title {{ font-family: 'Montserrat', sans-serif; font-size: 55px; color: #004d40; text-align: center; margin-top: 20px; margin-bottom: 50px; line-height: 1.2; text-transform: uppercase; text-shadow: 2px 2px 4px rgba(0,0,0,0.05); }}
-            .hero-image {{ width: 100%; height: 550px; object-fit: cover; border-radius: 40px; margin: 0 auto 50px auto; display: block; box-shadow: 0 15px 30px rgba(0,0,0,0.15); border: 10px solid white; background-color: white; }}
-            .cards-wrapper {{ display: flex; flex-direction: column; gap: 25px; flex: 1; }}
-            .card {{ background-color: white; border-radius: 25px; padding: 30px 40px; display: flex; align-items: flex-start; box-shadow: 0 8px 20px rgba(0,0,0,0.05); border-left: 15px solid #00acc1; height: auto; }}
-            .card-icon {{ font-size: 65px; margin-right: 30px; line-height: 1; }}
-            .card-text {{ flex: 1; min-width: 0; }}
-            .card-title {{ font-family: 'Montserrat', sans-serif; font-size: 28px; color: #00838f; margin-bottom: 10px; font-weight: 800; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; line-height: 1.3; }}
-            .card-desc {{ font-size: 22px; color: #455a64; line-height: 1.5; margin: 0; word-wrap: break-word; overflow-wrap: break-word; }}
-            .footer-note {{ margin-top: auto; padding-top: 50px; text-align: center; color: #00838f; font-weight: 800; font-size: 22px; letter-spacing: 2px; font-family: 'Montserrat', sans-serif; }}
-            .footer-social {{ display: flex; justify-content: center; align-items: center; margin-top: 10px; font-size: 22px; font-weight: 800; letter-spacing: 1px; color: #00838f; }}
-            .social-icon {{ margin-right: 6px; }}
-            .social-divider {{ margin: 0 15px; color: #00838f; }}
-            .download-btn {{ margin-top: 25px; background-color: #ff5722; color: white; border: none; padding: 20px 40px; font-size: 20px; font-family: 'Montserrat', sans-serif; border-radius: 40px; cursor: pointer; box-shadow: 0 8px 20px rgba(255, 87, 34, 0.4); font-weight: bold; }}
-            .download-btn:hover {{ background-color: #e64a19; }}
+            body {{ margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; background-color: #f4f6f8; font-family: 'Plus Jakarta Sans', sans-serif; }}
+            .slide-wrapper {{ margin-bottom: 50px; display: flex; flex-direction: column; align-items: center; width: 100%; }}
+            .poster-container {{ background-color: #ffffff; width: {w_px}px; min-height: {h_px}px; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.08); overflow: hidden; position: relative; }}
+            .poster-body {{ padding: 60px; flex: 1; display: flex; flex-direction: column; }}
+            .slide-indicator {{ color: #64748b; font-weight: 800; font-size: 20px; letter-spacing: 2px; margin-bottom: 15px; text-transform: uppercase; }}
+            .main-title {{ color: #0f172a; font-size: 54px; font-weight: 800; line-height: 1.2; margin: 0 0 40px 0; letter-spacing: -1px; }}
+            .content-row {{ display: flex; gap: 60px; align-items: center; flex: 1; }}
+            .image-col {{ flex: 1; }}
+            .text-col {{ flex: 1.2; display: flex; flex-direction: column; gap: 30px; }}
+            .text-col-vertical {{ display: flex; flex-direction: column; gap: 30px; margin-top: 20px; }}
+            .hero-image {{ width: 100%; height: auto; max-height: 800px; object-fit: contain; border-radius: 24px; }}
+            .minimalist-item {{ display: flex; align-items: flex-start; gap: 20px; }}
+            .item-icon {{ font-size: 45px; line-height: 1; }}
+            .item-title {{ font-size: 28px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }}
+            .item-desc {{ font-size: 22px; font-weight: 500; color: #475569; line-height: 1.6; }}
+            
+            /* PENGATURAN STEMPEL MUTLAK SESUAI INSTRUKSI */
+            .stamp-footer {{ background-color: #0f172a; width: 100%; padding: 30px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin-top: auto; }}
+            .stamp-line {{ color: #ffffff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; }}
+            .stamp-icon {{ margin-right: 8px; }}
+            .stamp-spacer {{ color: #475569; }}
+            
+            .download-btn {{ margin-top: 25px; background-color: #0f172a; color: #ffffff; border: none; padding: 18px 35px; font-size: 18px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; border-radius: 50px; cursor: pointer; transition: 0.2s; }}
+            .download-btn:hover {{ background-color: #334155; transform: translateY(-2px); }}
         </style>
     </head>
     <body>
@@ -251,26 +204,16 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
             function downloadPoster(posterId, btnId, slideNum) {{
                 const poster = document.getElementById(posterId);
                 const btn = document.getElementById(btnId);
-                const badge = poster.querySelector('.slide-badge');
-                if(badge) badge.style.display = 'none';
+                btn.innerHTML = '⏳ Sedang Memproses...';
                 
-                btn.innerHTML = '⏳ Memproses Resolusi Tinggi...';
-                btn.style.backgroundColor = '#757575';
-                
-                html2canvas(poster, {{ scale: 1, useCORS: true, backgroundColor: null }}).then(canvas => {{
-                    if(badge) badge.style.display = 'block'; 
-                    btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum;
-                    btn.style.backgroundColor = '#ff5722';
-                    
+                html2canvas(poster, {{ scale: 1.5, useCORS: true, backgroundColor: "#ffffff" }}).then(canvas => {{
+                    btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum + ' (Kualitas Tinggi)';
                     let link = document.createElement('a');
                     link.download = 'Infografis_Kreatif_' + slideNum + '.png';
                     link.href = canvas.toDataURL('image/png');
                     link.click();
                 }}).catch(err => {{
-                    if(badge) badge.style.display = 'block';
-                    alert("Gagal memproses gambar.");
                     btn.innerHTML = '<span>⬇️</span> Download Slide ' + slideNum;
-                    btn.style.backgroundColor = '#ff5722';
                 }});
             }}
         </script>
@@ -280,9 +223,56 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
     return html_template
 
 # ==========================================
+# 🧩 4. GENERATOR PROMPT MANUAL (COPTER UNTUK GEMINI PRIBADI)
+# ==========================================
+def create_manual_prompt(structured_data, topik, opsi_slide):
+    """Menghasilkan prompt cerdas untuk di-copy paste ke Gemini oleh user gaptek."""
+    slides = structured_data.get("slides", [])
+    jumlah_slide = len(slides)
+    
+    prompt = "🌟 **LANGKAH 1: Berikan instruksi ini ke Gemini Anda:**\n\n"
+    prompt += "```text\n"
+    prompt += f"Halo Gemini, saya ingin membuat infografis tentang {topik}.\n"
+    prompt += "Saya punya materi strukturnya. Tolong pahami dulu teks di bawah ini, tapi JANGAN buatkan gambarnya dulu. Cukup jawab 'Paham' jika kamu sudah membacanya.\n\n"
+    
+    for slide in slides:
+        prompt += f"[SLIDE {slide.get('slide_number', '')}]\n"
+        prompt += f"Judul Utama: {slide.get('infographic_title', '')}\n"
+        for item in slide.get("items", []):
+            prompt += f"• {item.get('title', '')}: {item.get('content', '')}\n"
+        
+        # Instruksi stempel mutlak untuk disatukan oleh AI
+        prompt += "\n"
+        prompt += "Wajib ada teks stempel persis 2 baris ini di bagian paling bawah desain (font seragam, warna kontras):\n"
+        prompt += "Baris 1: Studio Kreatif Pro - KTB UKM Jatim\n"
+        prompt += "Baris 2: [Ikon IG] @ktbukm.jatim   [Ikon Website] [https://ktbukm-jatim.store](https://ktbukm-jatim.store)\n"
+        prompt += "------------------------\n"
+    prompt += "```\n\n"
+    
+    prompt += "🎨 **LANGKAH 2: Eksekusi Gambar (Penting!)**\n"
+    prompt += "Setelah Gemini menjawab paham, masukkan instruksi pembuatan gambar ini "
+    if jumlah_slide > 1:
+        prompt += "**SATU PER SATU** (Jangan borongan agar hasilnya detail dan tidak buram):\n\n"
+        for slide in slides:
+            no = slide.get('slide_number', '')
+            prompt += f"- Ketik ini untuk Slide {no}: `Tolong buatkan gambar infografisnya untuk SLIDE {no} saja sekarang, pastikan teks dan stempel bawahnya ditulis dengan rapi.`\n"
+    else:
+        prompt += "sekarang:\n\n"
+        prompt += "- Ketik ini: `Tolong buatkan gambar infografisnya sekarang berdasarkan materi di atas. Pastikan teks dan stempel bawahnya ditulis dengan rapi.`\n"
+
+    return prompt
+
+# ==========================================
 # 🚀 MAIN APP RUNNER
 # ==========================================
 def run():
+    # --- KONFIGURASI GEMINI ---
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception as e:
+        st.error("Kredensial Gemini API Key bermasalah.")
+        st.stop()
+
     st.title("🎨 Ruang 3: Studio Kreasi Cetak / Visual")
     st.info("💡 **Informasi:** Studio ini ditenagai oleh Kecerdasan Buatan (AI) Desain Visual Profesional tingkat lanjut untuk merangkai tata letak dan gambar berkualitas tinggi secara otomatis.")
 
@@ -333,9 +323,9 @@ def run():
 
     st.divider()
     
-    # === FITUR UPLOAD GAMBAR DENGAN TAMPILAN JELAS DAN BESAR ===
+    # === FITUR UPLOAD GAMBAR ===
     st.markdown("### 📸 Upload Gambar Produk (SANGAT DISARANKAN)")
-    st.info("💡 **Tips Anti Gagal:** Mengunggah foto produk atau screenshot aplikasi Anda sendiri di sini akan **menjamin 100% desain jadi tanpa error/kosong**. Server lukis publik sering kali penuh atau kehabisan kuota bulanan!")
+    st.info("💡 **Tips Anti Gagal:** Jika Anda sudah memiliki foto produk sendiri, mengunggahnya di sini akan **menjamin 100% desain jadi seketika** dengan tata letak minimalis premium, tanpa harus memanggil AI pelukis.")
     
     uploaded_file = st.file_uploader("Upload Foto Asli Anda di sini (Format: PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
 
@@ -351,81 +341,71 @@ def run():
             
         with st.spinner("🤖 Art Director AI sedang merancang tata letak..."):
             try:
-                # 0. Proses Gambar Upload Manual
+                produk_name = st.session_state.jawaban.get("produk", "Produk Utama")
+                merk_name = st.session_state.jawaban.get("merk", "")
+                detail_topik = f"{merk_name} {produk_name}".strip()
+                
+                # 1. Struktur Teks (Gemini 2.5 Flash)
+                structured_data = generate_structured_text_gemini(user_input, opsi_slide, detail_topik, opsi_gaya)
+                
+                # 2. Siapkan Prompt Manual Cerdas
+                manual_prompt_text = create_manual_prompt(structured_data, detail_topik, opsi_slide)
+                
+                # 3. Proses Gambar (Manual atau Imagen 3)
+                slides = structured_data.get("slides", [])
+                total_slides = len(slides)
+                b64_images = []
+                
                 user_b64_img = ""
                 if uploaded_file is not None:
                     img_bytes = uploaded_file.getvalue()
                     b64_encoded = base64.b64encode(img_bytes).decode('utf-8')
                     user_b64_img = f"data:{uploaded_file.type};base64,{b64_encoded}"
 
-                # Menarik konteks produk
-                produk_name = st.session_state.jawaban.get("produk", "Produk Utama")
-                merk_name = st.session_state.jawaban.get("merk", "")
-                detail_topik = f"{merk_name} {produk_name}".strip()
-                
-                # 1. Analisis Naskah dengan Groq
-                structured_data = generate_structured_text_groq(user_input, opsi_slide, detail_topik, opsi_gaya)
-                slides = structured_data.get("slides", [])
-                total_slides = len(slides)
-                
-                b64_images = []
-                
-                # 2. Logika Gambar: Pakai Upload Manual ATAU Lukis Pakai AI
-                for idx, slide in enumerate(slides):
-                    slide_num = slide.get("slide_number", idx + 1)
-                    
-                    if user_b64_img:
-                        # Langsung gunakan gambar dari user
-                        b64_images.append(user_b64_img)
-                    else:
-                        base_prompt = slide.get("image_prompt", f"ultra-realistic photography for {detail_topik}")
-                        safe_prompt = f"{base_prompt}, completely textless, no letters, no words, clean surface"
+                try:
+                    for idx, slide in enumerate(slides):
+                        slide_num = slide.get("slide_number", idx + 1)
+                        if user_b64_img:
+                            b64_images.append(user_b64_img)
+                        else:
+                            base_prompt = slide.get("image_prompt", f"ultra-realistic photography for {detail_topik}")
+                            safe_prompt = f"{base_prompt}, clean background"
+                            with st.spinner(f"📸 Pelukis AI Google sedang memproduksi visual Slide {slide_num}/{total_slides}..."):
+                                b64_img = generate_image_gemini(safe_prompt, opsi_dimensi)
+                                b64_images.append(b64_img)
+                                
+                    # Merakit HTML
+                    with st.spinner("📐 Web Layout Engine sedang merakit Poster Minimalis Elegan..."):
+                        final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi)
+                        if user_b64_img:
+                            st.success(f"🎉 {total_slides} Poster berhasil dirender menggunakan FOTO ASLI ANDA!")
+                        else:
+                            st.success(f"🎉 {total_slides} Poster berhasil dirender dengan Mesin Google Imagen!")
                         
-                        with st.spinner(f"📸 Pelukis AI sedang memproduksi visual Slide {slide_num}/{total_slides}..."):
-                            # Sekarang kita membiarkan error terlempar keluar jika gagal
-                            b64_img = generate_image_with_retry(safe_prompt, opsi_dimensi)
-                            b64_images.append(b64_img)
-                
-                with st.spinner("📐 Web Layout Engine sedang merakit Poster Resolusi Tinggi..."):
-                    # 3. Merakit HTML/CSS Kualitas Tinggi
-                    final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi)
-                    
-                    if user_b64_img:
-                        st.success(f"🎉 {total_slides} Poster berhasil dirender menggunakan FOTO ASLI ANDA!")
+                        h_px = 1920 if "Vertical" in opsi_dimensi else (1080 if "Square" in opsi_dimensi else 1080)
+                        iframe_height = total_slides * (h_px + 100)
+                        st.components.v1.html(final_html, height=iframe_height, scrolling=True)
+                        
+                except Exception as img_err:
+                    error_msg = str(img_err)
+                    if "GEMINI_IMAGE_ERROR" in error_msg:
+                        st.error("⏳ **Gambar Dicekal / Limit Harian Habis:** Kuota pembuatan gambar harian Google Anda telah habis, ATAU filter keamanan AI memblokir instruksi visualnya.")
+                        st.info("💡 **SOLUSI PRAKTIS:** Anda bisa menggunakan menu **'Upload Gambar Produk'** di atas, ATAU menyalin instruksi praktis di bawah ini ke Gemini pribadi Anda.")
                     else:
-                        st.success(f"🎉 {total_slides} Poster berhasil dirender dengan AI Pelukis!")
-                    
-                    # 4. Tampilkan HTML Interaktif
-                    h_px = 1920 if "Vertical" in opsi_dimensi else (1080 if "Square" in opsi_dimensi else 1080)
-                    iframe_height = total_slides * (h_px + 200)
-                    
-                    st.components.v1.html(final_html, height=iframe_height, scrolling=True)
+                        st.error("❌ **Terjadi kendala saat memproduksi visual.** Silakan gunakan instruksi manual di bawah.")
 
-            # --- ERROR HANDLING PROFESIONAL ---
+                # 4. TAMPILAN PROMPT MANUAL (Selalu Muncul)
+                st.divider()
+                st.markdown("### 🤖 Instruksi Praktis (Copas ke Gemini Pribadi Anda)")
+                st.info("Jika hasil visual di atas gagal dirender karena server padat, Anda bisa memerintahkan Gemini pribadi Anda untuk membuatnya dengan cara **menyalin teks di bawah ini bertahap sesuai instruksi**:")
+                st.markdown(manual_prompt_text) # Menggunakan markdown agar terbaca cantik dan instruksinya jelas
+
             except Exception as e:
-                error_msg = str(e)
-                
-                if "HUGGINGFACE_ERROR" in error_msg:
-                    raw_err = error_msg.split("|")[1] if "|" in error_msg else error_msg
-                    
-                    if "depleted" in raw_err.lower() or "credits" in raw_err.lower():
-                        st.error("❌ **Kuota Pelukis AI Habis:** Akun Anda telah mencapai batas pemakaian bulanan gratis.")
-                    else:
-                        st.error("⏳ **Server AI Pelukis Sibuk:** Server publik sedang mengalami antrean penuh. Pembuatan gambar ditolak.")
-                    
-                    st.info("💡 **SOLUSI TERCEPAT & TERBAIK:** \nJangan khawatir! Silakan gunakan menu **📸 Upload Gambar Produk** di atas untuk mengunggah foto asli Anda sendiri. Dengan cara ini, sistem tidak akan bergantung pada AI Pelukis dan poster Anda **DIJAMIN 100% SELESAI** dalam hitungan detik!")
-                    
-                    with st.expander("🛠️ Lihat Detail Teknis (Untuk Developer)"):
-                        st.code(raw_err)
-                        
-                elif "FORMAT_JSON_RUSAK" in error_msg or "Expecting value" in error_msg:
-                    st.error("⏳ **Mesin AI Teks Sedang Sibuk:** Server sedang mengalami antrean padat sehingga respons terpotong di tengah jalan. Silakan klik tombol **Hasilkan Poster Berkualitas** sekali lagi.")
-                elif "API_ERROR" in error_msg or "429" in error_msg:
-                    st.error("⏳ **Kuota Server Penuh:** Layanan AI mencapai batas maksimal permintaan. Mohon tunggu beberapa detik sebelum mencoba kembali.")
+                gemini_err_msg = str(e)
+                if "FORMAT_JSON_RUSAK" in gemini_err_msg:
+                    st.error("⏳ **Mesin AI Teks Sedang Memproses Ulang:** Gagal menstrukturkan naskah Anda ke dalam format presentasi. Silakan klik tombol **Hasilkan Poster Berkualitas** sekali lagi.")
                 else:
-                    st.error("❌ **Terjadi Gangguan Komunikasi dengan Server AI.** Silakan coba kembali dalam beberapa saat.")
-                    with st.expander("🛠️ Lihat Detail Teknis (Untuk Developer)"):
-                        st.code(error_msg)
+                    st.error("❌ **Terjadi Gangguan Komunikasi dengan Server AI Google.** Silakan coba kembali dalam beberapa saat.")
 
     st.divider()
     st.markdown("### 🚀 Lanjut Produksi Karya Lain")
