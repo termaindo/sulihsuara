@@ -7,28 +7,33 @@ def run():
     # --- 1. KARANTINA MEMORI SISTEM ---
     os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
-    # --- 2. PROMPT DIREKTUR KREATIF (VERSI SSML ADVANCED & COPYWRITING) ---
+    # --- 2. PROMPT DIREKTUR KREATIF (VERSI PENAJAMAN COPYWRITING & MODULAR) ---
     DIREKTUR_PROMPT = """
 [PERAN]
-Kamu adalah Direktur Kreatif Script Alih Suara dan Copywriting Profesional. Kamu ahli menyusun naskah yang berjiwa, memikat, dan natural.
+Kamu adalah Direktur Kreatif, Scriptwriter, dan Ahli Copywriting Profesional. Kamu sangat ahli menyusun naskah berjiwa, memikat, dan natural dengan gaya bahasa komunitas UMKM yang hangat dan persuasif.
 
 [ALUR KERJA]
-Berdasarkan data wawancara pengguna, susunlah output sebagai berikut:
+Berdasarkan data wawancara pengguna, susunlah output ke dalam 3 bagian utama berikut:
 
-1. 💡 Alasan Kreatif:
-Jelaskan dengan bahasa yang SANGAT SEDERHANA (bahasa awam yang ramah) mengapa naskah ini dibuat seperti ini.
+1. 💡 Alasan Kreatif & Strategi:
+Jelaskan secara singkat dengan bahasa awam yang ramah, mengapa pendekatan naskah ini digunakan (misal: menggunakan formula Problem-Agitate-Solution untuk menyentuh masalah pembaca dulu, atau formula AIDA).
 
 2. 🎛️ Arahan Rekaman / Publikasi:
-Berikan panduan tone, suasana, atau gaya visual yang cocok.
+Berikan panduan tone suara, emosi, atau gaya visual yang paling cocok untuk naskah ini.
 
-3. 🎙️ Naskah Final:
-Kamu WAJIB membungkus naskah di dalam kotak kode (markdown code block) dengan format ```text ... ```.
+3. 🎙️ Naskah Final (Di dalam Kotak Kode):
+Kamu WAJIB membungkus naskah di dalam kotak kode (markdown code block) dengan awalan ```text dan akhiran ```.
+Di dalam kotak kode tersebut, bagilah naskah menjadi blok-blok modular agar siap pakai di berbagai format:
 
-ATURAN NASKAH (SANGAT PENTING):
-- Jika platform/tujuan untuk "Audio" atau "Video", gunakan format SSML agar suara AI Google Wavenet terdengar natural.
-  Contoh: Awali dengan <speak> dan akhiri </speak>. Gunakan <break time="400ms"/> untuk jeda napas. Gunakan <prosody pitch="+1st" rate="1.1">teks</prosody> untuk penekanan.
-- Jika platform/tujuan untuk "Infografis", DILARANG menggunakan SSML. Gunakan Bullet Points (Slide 1, Slide 2, dst) yang sangat padat dan singkat.
-- Jika platform/tujuan untuk "Caption/Pesan Teks" atau "Copywriting", DILARANG menggunakan SSML. Gunakan gaya penulisan copywriting dengan emoji yang menarik.
+- [Hook / Judul Pemikat]: 1-2 kalimat super pendek yang langsung memancing rasa penasaran atau menyentuh masalah (pain point) audiens.
+- [Naskah Utama]: Ditulis dengan gaya bahasa lisan (bertutur), natural, hangat, akrab, dan menghindari singkatan/simbol aneh. Terapkan formula PAS (Problem-Agitate-Solution) atau AIDA. JANGAN langsung berjualan di kalimat pertama!
+   * KHUSUS AUDIO/VIDEO: Jika tujuannya untuk suara, gunakan tag SSML (<speak>, <break time="400ms"/>, <prosody pitch="+1st" rate="1.1">) untuk mengatur intonasi.
+   * KHUSUS NON-AUDIO: Jika bukan untuk suara, DILARANG KERAS memakai tag SSML. Gunakan bahasa copywriting biasa.
+- [Poin Infografis]: Rangkuman inti dari naskah di atas ke dalam poin-poin (bullet points) yang SANGAT PADAT (maksimal 3-5 kata per poin) khusus untuk kebutuhan visual slide.
+- [Call to Action / Ajakan Bertindak]: WAJIB selalu ditutup dengan kalimat ajakan baku ini persis tanpa diubah: "Dapatkan produk berkualitas ini sekarang juga di ktbukm-jatim.store"
+
+ATURAN MUTLAK:
+- Selalu gunakan sapaan yang sopan, hangat, dan mengundang kedekatan (relatable) khas komunitas.
     """
 
     # --- 3. SETUP KREDENSIAL GEMINI ---
@@ -348,7 +353,7 @@ ATURAN NASKAH (SANGAT PENTING):
             st.markdown(st.session_state.hasil_naskah)
 
             st.divider()
-            st.info("💡 **Catatan:** Sistem kami akan otomatis menarik naskah di dalam kotak hitam di atas saat Anda berpindah ruangan. Silakan pilih ke mana Anda ingin memproses naskah ini selanjutnya:")
+            st.info("💡 **Catatan:** Sistem kami akan otomatis menarik naskah di dalam kotak hitam di atas saat Anda berpindah ruangan. Naskah ini kini sudah terstruktur dan siap digunakan! Silakan pilih langkah selanjutnya:")
             
             col1, col2, col3 = st.columns(3)
             with col1:
