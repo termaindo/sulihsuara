@@ -30,6 +30,7 @@ Di dalam kotak kode tersebut, bagilah naskah menjadi blok-blok modular agar siap
    * KHUSUS AUDIO/VIDEO: Jika tujuannya untuk suara, gunakan tag SSML (<speak>, <break time="400ms"/>, <prosody pitch="+1st" rate="1.1">) untuk mengatur intonasi.
    * KHUSUS NON-AUDIO: Jika bukan untuk suara, DILARANG KERAS memakai tag SSML. Gunakan bahasa copywriting biasa.
 - [Poin Infografis]: Rangkuman inti dari naskah di atas ke dalam poin-poin (bullet points) yang SANGAT PADAT (maksimal 3-5 kata per poin) khusus untuk kebutuhan visual slide.
+- [Objek Visual Aman]: WAJIB berikan 1 kalimat deskripsi fisik kemasan produk dalam Bahasa Inggris sebagai murni benda mati (contoh: "A minimalist pump bottle of liquid soap on a bathroom sink with green leaves"). DILARANG KERAS menyebutkan efeknya pada kulit, tubuh, atau kesehatan.
 - [Call to Action / Ajakan Bertindak]: WAJIB selalu ditutup dengan kalimat ajakan baku ini persis tanpa diubah: "Dapatkan produk berkualitas ini sekarang juga di ktbukm-jatim.store"
 
 ATURAN MUTLAK:
