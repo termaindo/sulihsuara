@@ -28,7 +28,7 @@ def generate_image_gemini(prompt, dimensi=""):
         )
 
         if not result.images:
-            raise Exception("Gambar kosong.")
+            raise Exception("Gambar kosong dari server.")
 
         img_byte_arr = io.BytesIO()
         result.images[0].image.save(img_byte_arr, format='JPEG')
@@ -36,7 +36,8 @@ def generate_image_gemini(prompt, dimensi=""):
         return f"data:image/jpeg;base64,{encoded}"
 
     except Exception as e:
-        raise Exception("GEMINI_IMAGE_ERROR|Filter keamanan atau server penuh.")
+        # Menangkap dan meneruskan pesan error asli dari Google ke sistem penanganan kita
+        raise Exception(f"GEMINI_IMAGE_ERROR|{str(e)}")
 
 # ==========================================
 # 🧩 2. GOOGLE GEMINI (2.5 FLASH) JSON WRAPPER
@@ -74,14 +75,23 @@ Format output HARUS JSON valid dengan struktur:
 }}
 ATURAN MUTLAK: 
 1. Buat jumlah slide: {opsi_slide}.
-2. image_prompt WAJIB berbahasa Inggris dan merupakan KIASAN VISUAL (bukan kata medis/sensitif) agar lolos sensor AI.{slide_rule}
-3. DILARANG menyuruh AI menggambar teks/huruf pada image_prompt."""
+2. image_prompt WAJIB berbahasa Inggris. {slide_rule}
+3. DILARANG menyuruh AI menggambar teks/huruf pada image_prompt.
+4. [SIASAT SENSOR GOOGLE SANGAT PENTING]: DILARANG KERAS menggunakan kata terkait manusia, organ tubuh, penyakit, obat, kesehatan, medis, darah, jarum, atau suplemen pada 'image_prompt'. Gunakan MURNI BENDA MATI ESTETIK (contoh: 'a glowing glass bottle on a marble table with soft studio lighting', 'a clean wooden desk with morning sunlight'). Ini agar gambar tidak diblokir sensor keamanan Google."""
+
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
 
     try:
         model = genai.GenerativeModel(
             "gemini-2.5-flash",
             system_instruction=system_prompt,
-            generation_config={"response_mime_type": "application/json", "temperature": 0.4}
+            generation_config={"response_mime_type": "application/json", "temperature": 0.4},
+            safety_settings=safety_settings
         )
         response = model.generate_content(f"Teks Dasar:\n{prompt_text}")
         return json.loads(response.text)
@@ -125,7 +135,6 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
         poster_id = f"poster-container-{slide_num}"
         btn_id = f"btn-{slide_num}"
         
-        # Penyesuaian layout minimalis
         if w_px > h_px:
             layout_html = f"""
             <div class="content-row">
@@ -148,6 +157,7 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
                     {layout_html}
                 </div>
                 
+                <!-- STEMPEL PATEN 2 BARIS (Kontras, Font Sama Besar) -->
                 <div class="stamp-footer">
                     <div class="stamp-line">Studio Kreatif Pro - KTB UKM JATIM</div>
                     <div class="stamp-line">
@@ -241,7 +251,6 @@ def create_manual_prompt(structured_data, topik, opsi_slide):
         for item in slide.get("items", []):
             prompt += f"• {item.get('title', '')}: {item.get('content', '')}\n"
         
-        # Instruksi stempel mutlak untuk disatukan oleh AI
         prompt += "\n"
         prompt += "Wajib ada teks stempel persis 2 baris ini di bagian paling bawah desain (font seragam, warna kontras):\n"
         prompt += "Baris 1: Studio Kreatif Pro - KTB UKM Jatim\n"
@@ -266,7 +275,6 @@ def create_manual_prompt(structured_data, topik, opsi_slide):
 # 🚀 MAIN APP RUNNER
 # ==========================================
 def run():
-    # --- KONFIGURASI GEMINI ---
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     except Exception as e:
@@ -323,7 +331,6 @@ def run():
 
     st.divider()
     
-    # === FITUR UPLOAD GAMBAR ===
     st.markdown("### 📸 Upload Gambar Produk (SANGAT DISARANKAN)")
     st.info("💡 **Tips Anti Gagal:** Jika Anda sudah memiliki foto produk sendiri, mengunggahnya di sini akan **menjamin 100% desain jadi seketika** dengan tata letak minimalis premium, tanpa harus memanggil AI pelukis.")
     
@@ -333,7 +340,6 @@ def run():
     st.markdown("### 📝 Naskah Dasar")
     user_input = st.text_area("Draft Naskah yang akan diproses AI:", value=naskah_final, height=150)
 
-    # === TOMBOL EKSEKUSI ===
     if st.button("✨ Hasilkan Poster Berkualitas", use_container_width=True, type="primary"):
         if not user_input.strip():
             st.warning("⚠️ Draft naskah tidak boleh kosong!")
@@ -345,13 +351,9 @@ def run():
                 merk_name = st.session_state.jawaban.get("merk", "")
                 detail_topik = f"{merk_name} {produk_name}".strip()
                 
-                # 1. Struktur Teks (Gemini 2.5 Flash)
                 structured_data = generate_structured_text_gemini(user_input, opsi_slide, detail_topik, opsi_gaya)
-                
-                # 2. Siapkan Prompt Manual Cerdas
                 manual_prompt_text = create_manual_prompt(structured_data, detail_topik, opsi_slide)
                 
-                # 3. Proses Gambar (Manual atau Imagen 3)
                 slides = structured_data.get("slides", [])
                 total_slides = len(slides)
                 b64_images = []
@@ -374,7 +376,6 @@ def run():
                                 b64_img = generate_image_gemini(safe_prompt, opsi_dimensi)
                                 b64_images.append(b64_img)
                                 
-                    # Merakit HTML
                     with st.spinner("📐 Web Layout Engine sedang merakit Poster Minimalis Elegan..."):
                         final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi)
                         if user_b64_img:
@@ -387,25 +388,33 @@ def run():
                         st.components.v1.html(final_html, height=iframe_height, scrolling=True)
                         
                 except Exception as img_err:
-                    error_msg = str(img_err)
-                    if "GEMINI_IMAGE_ERROR" in error_msg:
-                        st.error("⏳ **Gambar Dicekal / Limit Harian Habis:** Kuota pembuatan gambar harian Google Anda telah habis, ATAU filter keamanan AI memblokir instruksi visualnya.")
-                        st.info("💡 **SOLUSI PRAKTIS:** Anda bisa menggunakan menu **'Upload Gambar Produk'** di atas, ATAU menyalin instruksi praktis di bawah ini ke Gemini pribadi Anda.")
+                    error_msg = str(img_err).lower()
+                    
+                    if "403" in error_msg or "permission" in error_msg or "unsupported" in error_msg:
+                        pesan_awam = "Google membatasi akses fitur pembuat gambar (Imagen 3) untuk versi akun API gratis Anda di wilayah ini."
+                    elif "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
+                        pesan_awam = "Kuota gratis harian Anda untuk membuat gambar dari server Google sudah habis hari ini."
+                    elif "safety" in error_msg or "blocked" in error_msg or "content" in error_msg:
+                        pesan_awam = "Filter keamanan ketat Google menolak instruksi gambar karena dianggap mengandung kata sensitif/medis."
                     else:
-                        st.error("❌ **Terjadi kendala saat memproduksi visual.** Silakan gunakan instruksi manual di bawah.")
+                        pesan_awam = "Server penggambar Google sedang mengalami gangguan teknis atau terlalu sibuk."
 
-                # 4. TAMPILAN PROMPT MANUAL (Selalu Muncul)
+                    st.error(f"⏳ **Mesin Gambar Google Terkendala!**\n\n**Penyebab:** {pesan_awam}")
+                    
+                    st.info("💡 **SOLUSI INSTAN:** Jangan khawatir! Anda tetap bisa membuat desain 100% utuh detik ini juga dengan cara menggunakan fitur **'Upload Gambar Produk'** di bagian atas (menggunakan foto Anda sendiri), ATAU menyalin instruksi praktis di bawah ini ke ChatGPT / Gemini pribadi Anda.")
+
+                # 4. TAMPILAN PROMPT MANUAL
                 st.divider()
                 st.markdown("### 🤖 Instruksi Praktis (Copas ke Gemini Pribadi Anda)")
-                st.info("Jika hasil visual di atas gagal dirender karena server padat, Anda bisa memerintahkan Gemini pribadi Anda untuk membuatnya dengan cara **menyalin teks di bawah ini bertahap sesuai instruksi**:")
-                st.markdown(manual_prompt_text) # Menggunakan markdown agar terbaca cantik dan instruksinya jelas
+                st.info("Jika Anda tidak punya foto sendiri untuk di-upload, Anda bisa memerintahkan aplikasi Gemini biasa di HP/Laptop Anda untuk membuatkannya. Cukup **Salin (Copy)** teks di bawah ini dan **Tempel (Paste)** bertahap sesuai petunjuk:")
+                st.markdown(manual_prompt_text) 
 
             except Exception as e:
                 gemini_err_msg = str(e)
                 if "FORMAT_JSON_RUSAK" in gemini_err_msg:
-                    st.error("⏳ **Mesin AI Teks Sedang Memproses Ulang:** Gagal menstrukturkan naskah Anda ke dalam format presentasi. Silakan klik tombol **Hasilkan Poster Berkualitas** sekali lagi.")
+                    st.error("⏳ **Mesin AI Teks Sedang Memproses Ulang:** Gagal merapikan tata letak naskah Anda. Silakan klik tombol **Hasilkan Poster Berkualitas** sekali lagi.")
                 else:
-                    st.error("❌ **Terjadi Gangguan Komunikasi dengan Server AI Google.** Silakan coba kembali dalam beberapa saat.")
+                    st.error("❌ **Terjadi Gangguan Komunikasi dengan Server AI Google.** Silakan periksa koneksi internet atau coba kembali dalam beberapa saat.")
 
     st.divider()
     st.markdown("### 🚀 Lanjut Produksi Karya Lain")
