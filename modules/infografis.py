@@ -24,7 +24,7 @@ def setup_gemini():
 def process_product_image(uploaded_file):
     try:
         image = Image.open(uploaded_file)
-        # Menjaga RAM server dengan resize maksimal 800x800px
+        # Menjaga RAM server tetap aman (Max 800px)
         image.thumbnail((800, 800))
         
         buf = BytesIO()
@@ -43,18 +43,17 @@ def process_product_image(uploaded_file):
 def generate_json_structure(naskah):
     model = genai.GenerativeModel('gemini-2.5-flash')
     prompt = f"""
-    Anda adalah Direktur Kreatif. Ubah naskah promosi berikut menjadi struktur JSON murni.
-    Jika naskah panjang, buatkan menjadi maksimal 3 slide/halaman.
+    Ubah naskah promosi berikut menjadi struktur JSON murni.
+    Jika naskah panjang, buatkan menjadi urutan slide (carousel) maksimal 3 slide.
     
     Format wajib (JSON Array):
     [
         {{
             "slide_number": 1,
             "infographic_title": "Judul Singkat",
-            "items": ["Poin 1", "Poin 2", "Poin 3"]
+            "items": ["Poin 1", "Poin 2"]
         }}
     ]
-    
     Naskah: {naskah}
     """
     try:
@@ -63,11 +62,12 @@ def generate_json_structure(naskah):
         if match:
             return json.loads(match.group(0))
         return json.loads(response.text)
-    except Exception:
-        return {"error": "429"}
+    except Exception as e:
+        if "429" in str(e): return {"error": "429"}
+        return {"error": "FORMAT_JSON_RUSAK"}
 
 # ==========================================
-# ENGINE TEMA & CSS (LEGABILITAS TINGGI)
+# ENGINE TEMA & CSS (LEGABILITAS & STEMPEL 2 BARIS)
 # ==========================================
 def get_theme_css(theme_name, layout_type, mode_foto):
     # Penentuan Rasio Dimensi
@@ -78,28 +78,29 @@ def get_theme_css(theme_name, layout_type, mode_foto):
     else:
         aspect_ratio, max_width = "16 / 9", "700px"
 
-    # Palet Warna Kontras Tinggi
+    # Palet Warna & Tipografi Lega
     themes = {
         "minimalist": {"bg": "#ffffff", "text": "#212121", "accent": "#f5f5f5", "font": "sans-serif"},
         "elegant_dark": {"bg": "#1a1a2e", "text": "#ffffff", "accent": "#16213e", "font": "serif"},
-        "modern_gradient": {"bg": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", "text": "#1a1a2e", "accent": "rgba(255,255,255,0.3)", "font": "sans-serif"},
+        "modern_gradient": {"bg": "linear-gradient(135deg, #667eea, #764ba2)", "text": "#ffffff", "accent": "rgba(255,255,255,0.15)", "font": "sans-serif"},
         "earthy_nature": {"bg": "#f4f1ea", "text": "#2d3e2d", "accent": "#dce2d7", "font": "sans-serif"},
         "vibrant_pop": {"bg": "#FFEB3B", "text": "#212121", "accent": "#ffffff", "font": "Impact, sans-serif"}
     }
     
     t = themes.get(theme_name, themes["minimalist"])
     
+    # Efek Foto
     if mode_foto == "Foto Studio (Latar Putih)":
         img_style = "mix-blend-mode: multiply; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.1));"
     else:
-        img_style = "border-radius: 12px; border: 4px solid white; box-shadow: 0 12px 25px rgba(0,0,0,0.15);"
+        img_style = "border-radius: 12px; border: 3px solid white; box-shadow: 0 12px 25px rgba(0,0,0,0.15);"
 
     css = f"""
     <style>
         .poster-container {{
             width: 100%; max-width: {max_width}; aspect-ratio: {aspect_ratio};
             background: {t['bg']}; color: {t['text']}; font-family: {t['font']};
-            margin: 0 auto 30px auto; display: flex; flex-direction: column;
+            margin: 0 auto 40px auto; display: flex; flex-direction: column;
             justify-content: space-between; border-radius: 20px;
             padding: 35px; box-sizing: border-box; box-shadow: 0 20px 45px rgba(0,0,0,0.15);
         }}
@@ -124,10 +125,17 @@ def get_theme_css(theme_name, layout_type, mode_foto):
             line-height: 1.6; border-left: 6px solid {t['text']};
             box-sizing: border-box;
         }}
+        /* STEMPEL PATEN 2 BARIS */
         .poster-footer {{ 
-            text-align: center; font-size: 0.75em; border-top: 1px solid rgba(0,0,0,0.1); 
-            padding-top: 15px; margin-top: 25px; font-weight: 600; opacity: 0.8;
+            text-align: center; font-size: 0.72em; border-top: 1px solid rgba(128,128,128,0.3); 
+            padding-top: 15px; margin-top: 25px; font-weight: 600; line-height: 1.6;
         }}
+        .footer-line-1 {{ margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }}
+        .footer-line-2 {{ 
+            display: flex; align-items: center; justify-content: center; 
+            gap: 8px; opacity: 0.9; font-weight: 500;
+        }}
+        .icon-svg {{ width: 14px; height: 14px; fill: currentColor; vertical-align: middle; }}
     </style>
     """
     return css
@@ -136,6 +144,10 @@ def render_html_poster(json_slide, base64_img, layout_type, theme_name, mode_fot
     css = get_theme_css(theme_name, layout_type, mode_foto)
     items_html = "".join([f"<div class='item-box'>✓ {i}</div>" for i in json_slide.get("items", [])])
     
+    # SVG ICONS (Cleaned, no extra text)
+    icon_ig = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>'
+    icon_web = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1.001 19.923c-3.324-.431-5.992-2.793-6.817-6.002h2.298c.241 1.488.666 2.822 1.233 3.885-.888-.637-1.646-1.41-2.233-2.283.587.873 1.345 1.646 2.233 2.283.398.745.857 1.405 1.373 1.956-.036.053-.071.104-.107.161zm1.001-1.006c-.846 0-1.637-.621-2.277-1.657-.591-.958-1.026-2.228-1.223-3.66h7c-.197 1.432-.632 2.702-1.223 3.66-.64 1.036-1.431 1.657-2.277 1.657zm8.818-7.002h-2.298c-.241 1.488-.666 2.822-1.233 3.885.888-.637 1.646-1.41 2.233-2.283-.587.873-1.345 1.646-2.233 2.283-.398.745-.857 1.405-1.373 1.956.036.053.071.104.107.161 3.324-.431 5.992-2.793 6.817-6.002zm-10.819-10.923c3.324.431 5.992 2.793 6.817 6.002h-2.298c-.241-1.488-.666-2.822-1.233-3.885.888.637 1.646-1.41 2.233 2.283-.587-.873-1.345-1.646-2.233-2.283-.398-.745-.857-1.405-1.373-1.956.036-.053.071-.104.107-.161zm1.001 1.006c.846 0 1.637.621 2.277 1.657.591.958 1.026 2.228 1.223 3.66h-7c.197-1.432.632-2.702 1.223-3.66.64-1.036 1.431-1.657 2.277-1.657zm-8.818 7.002h2.298c.241-1.488.666-2.822 1.233-3.885-.888.637-1.646 1.41-2.233 2.283.587-.873-1.345-1.646-2.233-2.283.398-.745.857-1.405 1.373-1.956-.036-.053-.071-.104-.107-.161-3.324.431-5.992 2.793-6.817 6.002z"/></svg>'
+
     html = f"""
     {css}
     <div class="poster-container">
@@ -145,34 +157,17 @@ def render_html_poster(json_slide, base64_img, layout_type, theme_name, mode_fot
             <div class="items-container">{items_html}</div>
         </div>
         <div class="poster-footer">
-            <div>Studio Kreatif Pro - KTB UKM JATIM</div>
-            <div>📸 @ktbukm.jatim | 🌐 https://ktbukm-jatim.store</div>
+            <div class="footer-line-1">Studio Kreatif Pro - KTB UKM Jatim</div>
+            <div class="footer-line-2">
+                {icon_ig} @ktbukm.jatim &nbsp; | &nbsp; {icon_web} https://ktbukm-jatim.store
+            </div>
         </div>
     </div>
     """
     return html
 
 # ==========================================
-# FUNGSI: PANDUAN 2 LANGKAH MANUAL
-# ==========================================
-def create_manual_guide(naskah):
-    guide = f"""
-### 💡 Panduan Produksi Mandiri (2 Langkah)
-
-Jika Anda ingin hasil yang lebih bervariasi menggunakan ChatGPT atau Gemini Web, silakan ikuti langkah berikut:
-
-**Langkah 1: Membuat Konsep Konten (Copywriting)**
-*Salin teks ini dan tempel ke AI:*
-"Saya memiliki naskah produk: '{naskah}'. Tolong bedah naskah ini menjadi konsep konten infografis yang menarik. Jika naskahnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya."
-
-**Langkah 2: Membuat Prompt Gambar (Visual Design)**
-*Gunakan hasil dari Langkah 1, lalu tempel perintah ini:*
-"Berdasarkan konsep konten slide tersebut, buatkan saya 'Image Prompt' yang sangat detil untuk saya masukkan ke mesin AI Image Generator (seperti Midjourney atau DALL-E). Pastikan prompt tersebut menjelaskan gaya pencahayaan, komposisi produk, warna latar belakang yang estetik, dan suasana profesional untuk katalog produk UMKM."
-    """
-    return guide
-
-# ==========================================
-# MODUL UTAMA RUN() - ONE PAGE NAVIGATION
+# MODUL UTAMA RUN()
 # ==========================================
 def run():
     st.title("🎨 Ruang 3: Studio Cetak / Visual")
@@ -184,7 +179,7 @@ def run():
         naskah_mentah = "Produk Unggulan UMKM Jawa Timur."
 
     st.markdown("---")
-    st.warning("📸 **Panduan Foto:** Gunakan latar belakang putih polos untuk mode 'Studio' agar produk menyatu sempurna dengan desain.")
+    st.warning("📸 **Panduan Foto:** Gunakan latar belakang putih polos untuk hasil transparan instan pada mode 'Studio'.")
     
     st.markdown("### 1. Pengaturan Produksi")
     mode_foto = st.radio(
@@ -204,36 +199,66 @@ def run():
         if not uploaded_file:
             st.warning("⚠️ Unggah foto produk terlebih dahulu.")
         else:
-            with st.spinner("⚙️ Direktur kreatif sedang memproduksi visual cetakan..."):
-                base64_img = process_product_image(uploaded_file)
-                json_data = generate_json_structure(naskah_mentah)
-                
-                if isinstance(json_data, dict) and json_data.get("error") == "429":
-                    st.error("⏳ Server sedang padat. Tunggu 1 menit ya.")
-                else:
-                    st.success("✨ Visual Berhasil Dicetak!")
-                    theme = random.choice(["minimalist", "elegant_dark", "modern_gradient", "earthy_nature", "vibrant_pop"])
+            try:
+                with st.spinner("⚙️ Direktur kreatif sedang memproduksi visual cetakan..."):
+                    base64_img = process_product_image(uploaded_file)
+                    json_data = generate_json_structure(naskah_mentah)
                     
-                    # Gabungkan semua slide ke dalam satu string HTML
-                    all_slides_html = ""
-                    for slide in json_data:
-                        all_slides_html += render_html_poster(slide, base64_img, layout_choice, theme, mode_foto)
-                    
-                    st.session_state.last_full_html = all_slides_html
-                    
-    # Area Output (Main Page)
-    if "last_full_html" in st.session_state:
-        st.components.v1.html(st.session_state.last_full_html, height=850, scrolling=True)
+                    if isinstance(json_data, dict) and json_data.get("error") == "429":
+                        st.error("⏳ **Server Google sedang mendinginkan mesin, mohon tunggu 1 menit lalu tekan tombolnya lagi.**")
+                    else:
+                        st.success("✨ Visual Berhasil Dicetak!")
+                        theme = random.choice(["minimalist", "elegant_dark", "modern_gradient", "earthy_nature", "vibrant_pop"])
+                        
+                        all_slides_html = ""
+                        if isinstance(json_data, list):
+                            for slide in json_data:
+                                all_slides_html += render_html_poster(slide, base64_img, layout_choice, theme, mode_foto)
+                        else:
+                            all_slides_html = render_html_poster(json_data, base64_img, layout_choice, theme, mode_foto)
+                        
+                        st.session_state.infografis_output = all_slides_html
+            except Exception:
+                st.error("❌ Terjadi gangguan komunikasi dengan Server AI Google.")
+
+    # --- TAMPILAN OUTPUT & DOWNLOAD ---
+    if "infografis_output" in st.session_state:
+        st.components.v1.html(st.session_state.infografis_output, height=850, scrolling=True)
         
-        # Tombol Download Bersih
         st.download_button(
             label="📥 Unduh Hasil Desain",
-            data=f"<html><body style='margin:0; background:#f0f2f6; display:flex; flex-direction:column; align-items:center; padding:40px;'>{st.session_state.last_full_html}</body></html>",
+            data=f"<html><body style='margin:0; background:#f0f2f6; display:flex; flex-direction:column; align-items:center; padding:40px;'>{st.session_state.infografis_output}</body></html>",
             file_name="desain_studio_kreatif.html",
             mime="text/html",
             use_container_width=True
         )
 
-    # Panduan Manual 2 Langkah & Multi-slide
-    st.markdown("---")
-    st.markdown(create_manual_guide(naskah_mentah))
+    # --- PANDUAN 2 LANGKAH MANUAL ---
+    st.divider()
+    st.markdown("### 🤖 Instruksi Praktis (Copas ke Gemini Pribadi Anda)")
+    st.info("Jika Anda tidak punya foto sendiri, gunakan panduan langkah demi langkah di bawah ini:")
+
+    # LANGKAH 1
+    st.markdown("**Langkah 1: Membuat Konsep Konten (Copywriting) Salin teks ini, dengan cara klik icon tumpukan dokumen di sebelah kanan atas kotak di bawah ini dan tempel ke AI**")
+    prompt_copywriting = f"""Saya memiliki naskah produk: '{naskah_mentah}'. Tolong bedah naskah ini menjadi konsep konten infografis yang menarik. Jika naskahnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya. Pastikan di bagian bawah setiap slide memuat stempel paten 2 baris: 
+Baris 1: Studio Kreatif Pro - KTB UKM Jatim
+Baris 2: Instagram: @ktbukm.jatim | Website: https://ktbukm-jatim.store"""
+    st.code(prompt_copywriting, language="text")
+
+    # LANGKAH 2
+    st.markdown("**Langkah 2: Membuat Prompt Gambar (Visual Design)**")
+    prompt_visual = "Berdasarkan konsep konten slide tersebut, buatkan saya 'Image Prompt' yang sangat detil untuk saya masukkan ke mesin AI Image Generator (seperti Midjourney atau DALL-E). Pastikan prompt tersebut menjelaskan gaya pencahayaan, komposisi produk, warna latar belakang yang estetik, dan suasana profesional untuk katalog produk UMKM."
+    st.code(prompt_visual, language="text")
+
+    # --- NAVIGASI STUDIO ---
+    st.divider()
+    st.markdown("### 🚀 Lanjut Produksi Karya Lain")
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        if st.button("🎙️ Ke Studio Kreasi Suara / Audio", use_container_width=True):
+            st.session_state.menu_aktif = "2. Studio Kreasi Suara / Audio"
+            st.rerun()
+    with col_nav2:
+        if st.button("📝 Kembali ke Studio Kreasi Naskah", use_container_width=True):
+            st.session_state.menu_aktif = "1. Studio Kreasi Naskah"
+            st.rerun()
