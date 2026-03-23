@@ -43,17 +43,23 @@ def process_product_image(uploaded_file):
 def generate_json_structure(naskah):
     model = genai.GenerativeModel('gemini-2.5-flash')
     prompt = f"""
-    Ubah naskah promosi berikut menjadi struktur JSON murni.
-    Format wajib:
-    {{
-        "infographic_title": "Judul Singkat",
-        "items": ["Poin 1", "Poin 2", "Poin 3"]
-    }}
+    Anda adalah Direktur Kreatif. Ubah naskah promosi berikut menjadi struktur JSON murni.
+    Jika naskah panjang, buatkan menjadi maksimal 3 slide/halaman.
+    
+    Format wajib (JSON Array):
+    [
+        {{
+            "slide_number": 1,
+            "infographic_title": "Judul Singkat",
+            "items": ["Poin 1", "Poin 2", "Poin 3"]
+        }}
+    ]
+    
     Naskah: {naskah}
     """
     try:
         response = model.generate_content(prompt)
-        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        match = re.search(r'\[.*\]', response.text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
         return json.loads(response.text)
@@ -61,7 +67,7 @@ def generate_json_structure(naskah):
         return {"error": "429"}
 
 # ==========================================
-# ENGINE TEMA & CSS (KONTRAST & SPASI FIX)
+# ENGINE TEMA & CSS (LEGABILITAS TINGGI)
 # ==========================================
 def get_theme_css(theme_name, layout_type, mode_foto):
     # Penentuan Rasio Dimensi
@@ -72,7 +78,7 @@ def get_theme_css(theme_name, layout_type, mode_foto):
     else:
         aspect_ratio, max_width = "16 / 9", "700px"
 
-    # Perbaikan Kontras Warna & Tipografi
+    # Palet Warna Kontras Tinggi
     themes = {
         "minimalist": {"bg": "#ffffff", "text": "#212121", "accent": "#f5f5f5", "font": "sans-serif"},
         "elegant_dark": {"bg": "#1a1a2e", "text": "#ffffff", "accent": "#16213e", "font": "serif"},
@@ -83,18 +89,17 @@ def get_theme_css(theme_name, layout_type, mode_foto):
     
     t = themes.get(theme_name, themes["minimalist"])
     
-    # Efek Foto
     if mode_foto == "Foto Studio (Latar Putih)":
         img_style = "mix-blend-mode: multiply; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.1));"
     else:
-        img_style = "border-radius: 12px; border: 4px solid white; box-shadow: 0 12px 25px rgba(0,0,0,0.2);"
+        img_style = "border-radius: 12px; border: 4px solid white; box-shadow: 0 12px 25px rgba(0,0,0,0.15);"
 
     css = f"""
     <style>
         .poster-container {{
             width: 100%; max-width: {max_width}; aspect-ratio: {aspect_ratio};
             background: {t['bg']}; color: {t['text']}; font-family: {t['font']};
-            margin: 0 auto; display: flex; flex-direction: column;
+            margin: 0 auto 30px auto; display: flex; flex-direction: column;
             justify-content: space-between; border-radius: 20px;
             padding: 35px; box-sizing: border-box; box-shadow: 0 20px 45px rgba(0,0,0,0.15);
         }}
@@ -109,7 +114,7 @@ def get_theme_css(theme_name, layout_type, mode_foto):
         }}
         .poster-image-wrap {{ width: 100%; display: flex; justify-content: center; }}
         .poster-image-wrap img {{
-            max-width: 95%; max-height: 280px; object-fit: contain;
+            max-width: 95%; max-height: 250px; object-fit: contain;
             {img_style}
         }}
         .items-container {{ width: 100%; display: flex; flex-direction: column; gap: 15px; }}
@@ -127,14 +132,14 @@ def get_theme_css(theme_name, layout_type, mode_foto):
     """
     return css
 
-def render_html_poster(json_data, base64_img, layout_type, theme_name, mode_foto):
+def render_html_poster(json_slide, base64_img, layout_type, theme_name, mode_foto):
     css = get_theme_css(theme_name, layout_type, mode_foto)
-    items_html = "".join([f"<div class='item-box'>✓ {i}</div>" for i in json_data.get("items", [])])
+    items_html = "".join([f"<div class='item-box'>✓ {i}</div>" for i in json_slide.get("items", [])])
     
     html = f"""
     {css}
     <div class="poster-container">
-        <div class="poster-header">{json_data.get('infographic_title', 'Visual Produk')}</div>
+        <div class="poster-header">{json_slide.get('infographic_title', 'Visual Produk')}</div>
         <div class="poster-content">
             <div class="poster-image-wrap"><img src="{base64_img}"></div>
             <div class="items-container">{items_html}</div>
@@ -148,41 +153,42 @@ def render_html_poster(json_data, base64_img, layout_type, theme_name, mode_foto
     return html
 
 # ==========================================
-# FUNGSI: PROMPT COPAS (RESTORED)
+# FUNGSI: PANDUAN 2 LANGKAH MANUAL
 # ==========================================
-def create_manual_prompt(naskah):
-    return f"""
-*Salin teks di bawah ini dan tempel di ChatGPT atau Gemini Web:*
+def create_manual_guide(naskah):
+    guide = f"""
+### 💡 Panduan Produksi Mandiri (2 Langkah)
 
-"Buatkan saya ide desain infografis atau poster untuk mempromosikan produk saya. 
-Gunakan elemen visual yang menarik dan layout yang profesional.
+Jika Anda ingin hasil yang lebih bervariasi menggunakan ChatGPT atau Gemini Web, silakan ikuti langkah berikut:
 
-Berikut adalah naskah dasar yang ingin saya sampaikan:
-{naskah}
+**Langkah 1: Membuat Konsep Konten (Copywriting)**
+*Salin teks ini dan tempel ke AI:*
+"Saya memiliki naskah produk: '{naskah}'. Tolong bedah naskah ini menjadi konsep konten infografis yang menarik. Jika naskahnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya."
 
-Tolong berikan rekomendasi warna, tata letak teks, dan konsep gambar yang cocok."
+**Langkah 2: Membuat Prompt Gambar (Visual Design)**
+*Gunakan hasil dari Langkah 1, lalu tempel perintah ini:*
+"Berdasarkan konsep konten slide tersebut, buatkan saya 'Image Prompt' yang sangat detil untuk saya masukkan ke mesin AI Image Generator (seperti Midjourney atau DALL-E). Pastikan prompt tersebut menjelaskan gaya pencahayaan, komposisi produk, warna latar belakang yang estetik, dan suasana profesional untuk katalog produk UMKM."
     """
+    return guide
 
 # ==========================================
-# MODUL UTAMA RUN()
+# MODUL UTAMA RUN() - ONE PAGE NAVIGATION
 # ==========================================
 def run():
     st.title("🎨 Ruang 3: Studio Cetak / Visual")
     setup_gemini()
 
-    # Ambil naskah dari state
     naskah_mentah = st.session_state.get("hasil_naskah", "")
     if not naskah_mentah:
         st.info("ℹ️ Silakan buat naskah di Ruang 1 terlebih dahulu.")
         naskah_mentah = "Produk Unggulan UMKM Jawa Timur."
 
     st.markdown("---")
-    st.warning("📸 **Panduan Foto:** Gunakan latar belakang putih polos (tembok/karton) untuk hasil transparan yang rapi pada mode 'Studio'.")
+    st.warning("📸 **Panduan Foto:** Gunakan latar belakang putih polos untuk mode 'Studio' agar produk menyatu sempurna dengan desain.")
     
     st.markdown("### 1. Pengaturan Produksi")
     mode_foto = st.radio(
-        "Jenis Foto Produk:",
-        ["Foto Studio (Latar Putih)", "Foto Estetik / Sudah Ada Latar"],
+        "Jenis Foto Produk:", ["Foto Studio (Latar Putih)", "Foto Estetik / Sudah Ada Latar"],
         horizontal=True
     )
 
@@ -194,43 +200,40 @@ def run():
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Trigger Produksi
     if st.button("🚀 Buat Desain Visual Sekarang!", type="primary"):
         if not uploaded_file:
-            st.warning("⚠️ Unggah foto produk terlebih dahulu agar Direktur Kreatif bisa memproses.")
+            st.warning("⚠️ Unggah foto produk terlebih dahulu.")
         else:
-            # Spinner sesuai instruksi paten
             with st.spinner("⚙️ Direktur kreatif sedang memproduksi visual cetakan..."):
                 base64_img = process_product_image(uploaded_file)
                 json_data = generate_json_structure(naskah_mentah)
                 
                 if isinstance(json_data, dict) and json_data.get("error") == "429":
-                    st.error("⏳ Server sedang padat. Tunggu 1 menit lalu coba lagi.")
+                    st.error("⏳ Server sedang padat. Tunggu 1 menit ya.")
                 else:
                     st.success("✨ Visual Berhasil Dicetak!")
-                    
-                    # Tema Acak & Render
                     theme = random.choice(["minimalist", "elegant_dark", "modern_gradient", "earthy_nature", "vibrant_pop"])
-                    html_poster = render_html_poster(json_data, base64_img, layout_choice, theme, mode_foto)
                     
-                    # Simpan ke state agar tidak hilang saat klik download
-                    st.session_state.last_html = html_poster
+                    # Gabungkan semua slide ke dalam satu string HTML
+                    all_slides_html = ""
+                    for slide in json_data:
+                        all_slides_html += render_html_poster(slide, base64_img, layout_choice, theme, mode_foto)
                     
-    # Area Output (Muncul jika sudah ada data di state)
-    if "last_html" in st.session_state:
-        st.components.v1.html(st.session_state.last_html, height=800, scrolling=True)
+                    st.session_state.last_full_html = all_slides_html
+                    
+    # Area Output (Main Page)
+    if "last_full_html" in st.session_state:
+        st.components.v1.html(st.session_state.last_full_html, height=850, scrolling=True)
         
-        # Tombol Download (Label disederhanakan)
+        # Tombol Download Bersih
         st.download_button(
             label="📥 Unduh Hasil Desain",
-            data=f"<html><body style='margin:0; background:#f0f2f6; display:flex; justify-content:center; padding:40px;'>{st.session_state.last_html}</body></html>",
+            data=f"<html><body style='margin:0; background:#f0f2f6; display:flex; flex-direction:column; align-items:center; padding:40px;'>{st.session_state.last_full_html}</body></html>",
             file_name="desain_studio_kreatif.html",
             mime="text/html",
             use_container_width=True
         )
 
-    # Prompt Siap Copas (Selalu muncul di bawah)
+    # Panduan Manual 2 Langkah & Multi-slide
     st.markdown("---")
-    st.markdown("### 💡 Instruksi Praktis Prompt Manual")
-    st.info("Ingin mencoba variasi desain di platform AI lain? Salin instruksi di bawah ini:")
-    st.code(create_manual_prompt(naskah_mentah), language="text")
+    st.markdown(create_manual_guide(naskah_mentah))
