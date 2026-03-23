@@ -6,7 +6,7 @@ import base64
 import re
 from io import BytesIO
 from PIL import Image
-from rembg import remove
+# PENTING: import rembg DIHAPUS dari sini untuk mencegah aplikasi stuck di awal (Lazy Loading)
 from google.api_core.exceptions import ResourceExhausted
 
 # ==========================================
@@ -28,11 +28,14 @@ def process_product_image(uploaded_file):
     Mengembalikan string base64 untuk dirender di HTML.
     """
     try:
+        # [SOLUSI STUCK]: Lazy Loading import rembg
+        # rembg hanya dipanggil saat fungsi ini benar-benar dijalankan oleh tombol
+        from rembg import remove 
+
         # Buka gambar menggunakan Pillow
         image = Image.open(uploaded_file)
         
         # [CRITICAL] Resize gambar untuk menyelamatkan RAM Server Streamlit
-        # thumbnail() akan mempertahankan aspect ratio
         image.thumbnail((800, 800))
         
         # Konversi ke format byte
@@ -41,7 +44,7 @@ def process_product_image(uploaded_file):
         byte_im = buf.getvalue()
         
         # Hapus background menggunakan rembg
-        with st.spinner("✨ Sedang memotong background gambar secara otomatis..."):
+        with st.spinner("✨ Sedang memotong background gambar secara otomatis (Mungkin butuh waktu beberapa detik pada proses pertama)..."):
             output_bytes = remove(byte_im)
             
         # Ubah ke base64 agar bisa disematkan langsung ke dalam HTML tag <img>
