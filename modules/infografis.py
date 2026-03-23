@@ -125,6 +125,9 @@ ATURAN MUTLAK:
         response = model.generate_content(f"Teks Dasar:\n{prompt_text}")
         return json.loads(response.text)
     except Exception as e:
+        err_msg = str(e).lower()
+        if "429" in err_msg or "quota" in err_msg:
+            raise Exception(f"QUOTA_TEKS_HABIS|{str(e)}")
         raise Exception("FORMAT_JSON_RUSAK|Gagal memproses struktur visual.")
 
 # ==========================================
@@ -555,7 +558,9 @@ def run():
 
             except Exception as e:
                 gemini_err_msg = str(e)
-                if "FORMAT_JSON_RUSAK" in gemini_err_msg:
+                if "QUOTA_TEKS_HABIS" in gemini_err_msg or "429" in gemini_err_msg.lower():
+                    st.error("⏳ **Server Google sedang mendinginkan mesin, mohon tunggu 1 menit lalu tekan tombolnya lagi.**")
+                elif "FORMAT_JSON_RUSAK" in gemini_err_msg:
                     st.error("⏳ **Mesin AI Teks Sedang Memproses Ulang:** Gagal merapikan tata letak naskah Anda. Silakan klik tombol **Hasilkan Poster Berkualitas** sekali lagi.")
                 else:
                     st.error("❌ **Terjadi Gangguan Komunikasi dengan Server AI Google.** Silakan periksa koneksi internet atau coba kembali dalam beberapa saat.")
