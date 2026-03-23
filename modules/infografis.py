@@ -4,6 +4,7 @@ import os
 import json
 import base64
 import io
+import random
 import google.generativeai as genai
 from PIL import Image
 import time
@@ -116,9 +117,9 @@ ATURAN MUTLAK:
         raise Exception("FORMAT_JSON_RUSAK|Gagal memproses struktur visual.")
 
 # ==========================================
-# 🧩 3. WEB-BASED LAYOUT ENGINE (HTML/CSS MINIMALIS)
+# 🧩 3. WEB-BASED LAYOUT ENGINE (HTML/CSS MULTI-TEMA)
 # ==========================================
-def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
+def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi, tema="minimalist"):
     w_px, h_px = 1080, 1920
     if "Square" in opsi_dimensi:
         w_px, h_px = 1080, 1080
@@ -128,6 +129,43 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
     slides = data_json.get("slides", [])
     all_posters_html = ""
     
+    # --- LOGIKA TEMA (CSS VARIATIONS) ---
+    if tema == "elegant_dark":
+        css_colors = """
+            .poster-container { background-color: #0f172a; }
+            .slide-indicator { color: #d4af37; border-bottom: 2px solid #d4af37; padding-bottom: 5px; display: inline-block; }
+            .main-title { color: #f8fafc; }
+            .item-title { color: #f8fafc; }
+            .item-desc { color: #cbd5e1; }
+            .stamp-footer { background-color: #020617; border-top: 2px solid #d4af37; }
+            .stamp-line { color: #d4af37; }
+            .stamp-spacer { color: #334155; }
+        """
+    elif tema == "modern_gradient":
+        css_colors = """
+            .poster-container { background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%); }
+            .slide-indicator { color: #0284c7; background-color: #bae6fd; padding: 6px 16px; border-radius: 20px; display: inline-block; }
+            .main-title { color: #0369a1; }
+            .minimalist-item { background: rgba(255, 255, 255, 0.7); padding: 25px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.04); border: 1px solid #ffffff; }
+            .item-icon { background: #ffffff; padding: 15px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.02); margin-top: -10px; }
+            .item-title { color: #0f172a; }
+            .item-desc { color: #334155; }
+            .stamp-footer { background-color: #0284c7; }
+            .stamp-line { color: #ffffff; }
+            .stamp-spacer { color: #7dd3fc; }
+        """
+    else: # minimalist (default)
+        css_colors = """
+            .poster-container { background-color: #ffffff; }
+            .slide-indicator { color: #64748b; }
+            .main-title { color: #0f172a; }
+            .item-title { color: #1e293b; }
+            .item-desc { color: #475569; }
+            .stamp-footer { background-color: #0f172a; }
+            .stamp-line { color: #ffffff; }
+            .stamp-spacer { color: #475569; }
+        """
+
     for idx, slide in enumerate(slides):
         slide_num = slide.get("slide_number", idx + 1)
         b64_img = b64_images[idx] if idx < len(b64_images) else ""
@@ -201,10 +239,10 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
         <style>
             body {{ margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; background-color: #f4f6f8; font-family: 'Plus Jakarta Sans', sans-serif; }}
             .slide-wrapper {{ margin-bottom: 50px; display: flex; flex-direction: column; align-items: center; width: 100%; }}
-            .poster-container {{ background-color: #ffffff; width: {w_px}px; min-height: {h_px}px; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.08); overflow: hidden; position: relative; }}
+            .poster-container {{ width: {w_px}px; min-height: {h_px}px; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.08); overflow: hidden; position: relative; }}
             .poster-body {{ padding: 60px; flex: 1; display: flex; flex-direction: column; }}
-            .slide-indicator {{ color: #64748b; font-weight: 800; font-size: 20px; letter-spacing: 2px; margin-bottom: 15px; text-transform: uppercase; }}
-            .main-title {{ color: #0f172a; font-size: 54px; font-weight: 800; line-height: 1.2; margin: 0 0 40px 0; letter-spacing: -1px; }}
+            .slide-indicator {{ font-weight: 800; font-size: 20px; letter-spacing: 2px; margin-bottom: 15px; text-transform: uppercase; }}
+            .main-title {{ font-size: 54px; font-weight: 800; line-height: 1.2; margin: 0 0 40px 0; letter-spacing: -1px; }}
             .content-row {{ display: flex; gap: 60px; align-items: center; flex: 1; }}
             .image-col {{ flex: 1; }}
             .text-col {{ flex: 1.2; display: flex; flex-direction: column; gap: 30px; }}
@@ -212,17 +250,19 @@ def render_beautiful_html_poster(data_json, b64_images, opsi_dimensi):
             .hero-image {{ width: 100%; height: auto; max-height: 800px; object-fit: contain; border-radius: 24px; }}
             .minimalist-item {{ display: flex; align-items: flex-start; gap: 20px; }}
             .item-icon {{ font-size: 45px; line-height: 1; }}
-            .item-title {{ font-size: 28px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }}
-            .item-desc {{ font-size: 22px; font-weight: 500; color: #475569; line-height: 1.6; }}
+            .item-title {{ font-size: 28px; font-weight: 800; margin-bottom: 8px; }}
+            .item-desc {{ font-size: 22px; font-weight: 500; line-height: 1.6; }}
             
             /* PENGATURAN STEMPEL MUTLAK SESUAI INSTRUKSI */
-            .stamp-footer {{ background-color: #0f172a; width: 100%; padding: 30px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin-top: auto; }}
-            .stamp-line {{ color: #ffffff; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; }}
+            .stamp-footer {{ width: 100%; padding: 30px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin-top: auto; }}
+            .stamp-line {{ font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; }}
             .stamp-icon {{ margin-right: 8px; }}
-            .stamp-spacer {{ color: #475569; }}
             
-            .download-btn {{ margin-top: 25px; background-color: #0f172a; color: #ffffff; border: none; padding: 18px 35px; font-size: 18px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; border-radius: 50px; cursor: pointer; transition: 0.2s; }}
+            .download-btn {{ margin-top: 25px; background-color: #0f172a; color: #ffffff; border: none; padding: 18px 35px; font-size: 18px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; border-radius: 50px; cursor: pointer; transition: 0.2s; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }}
             .download-btn:hover {{ background-color: #334155; transform: translateY(-2px); }}
+            
+            /* INJEKSI TEMA CSS DINAMIS */
+            {css_colors}
         </style>
     </head>
     <body>
@@ -382,6 +422,11 @@ def run():
                     user_b64_img = f"data:{uploaded_file.type};base64,{b64_encoded}"
 
                 try:
+                    # Tentukan Tema: Diacak HANYA JIKA user mengupload gambar sendiri
+                    tema_pilihan = "minimalist"
+                    if user_b64_img:
+                        tema_pilihan = random.choice(["minimalist", "elegant_dark", "modern_gradient"])
+
                     for idx, slide in enumerate(slides):
                         slide_num = slide.get("slide_number", idx + 1)
                         if user_b64_img:
@@ -393,8 +438,8 @@ def run():
                                 b64_img = generate_image_gemini(safe_prompt, opsi_dimensi)
                                 b64_images.append(b64_img)
                                 
-                    with st.spinner("📐 Web Layout Engine sedang merakit Poster Minimalis Elegan..."):
-                        final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi)
+                    with st.spinner("📐 Web Layout Engine sedang merakit Poster..."):
+                        final_html = render_beautiful_html_poster(structured_data, b64_images, opsi_dimensi, tema=tema_pilihan)
                         if user_b64_img:
                             st.success(f"🎉 {total_slides} Poster berhasil dirender menggunakan FOTO ASLI ANDA!")
                         else:
