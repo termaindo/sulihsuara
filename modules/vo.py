@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import calendar
 import io 
-import google.generativeai as genai # Tambahan wajib untuk AI Pengecek Naskah
+import google.generativeai as genai
 
 # --- KONFIGURASI KUOTA ---
 FILE_KUOTA = "pemakaian_tts.json"
@@ -136,8 +136,9 @@ def run():
         st.warning(f"⚠️ **PERHATIAN: KUOTA HAMPIR HABIS!**\nAnda telah menggunakan {pemakaian_saat_ini:,} karakter. Harap berhemat. Kuota Google TTS Anda akan otomatis di-reset menjadi nol (0) dalam **{sisa_hari} hari** lagi.")
 
     # --- 2. LOGIKA PENARIKAN, ADAPTASI OTOMATIS AI, & PENYIMPANAN DATA ---
-    if "naskah_vo" not in st.session_state:
-        st.session_state.naskah_vo = ""
+    # Perbaikan Kunci Utama Editabilitas: Menggunakan key state Streamlit murni
+    if "naskah_vo_editor" not in st.session_state:
+        st.session_state.naskah_vo_editor = ""
     if "last_raw_naskah" not in st.session_state:
         st.session_state.last_raw_naskah = ""
 
@@ -152,6 +153,7 @@ def run():
         except:
             pass
 
+        # Hanya menimpa editor JIKA ada naskah BARU yang masuk
         if raw_text != st.session_state.last_raw_naskah:
             st.session_state.last_raw_naskah = raw_text 
             
@@ -188,16 +190,16 @@ Teks Asli:
                         response = model_adaptasi.generate_content(PROMPT_ADAPTASI)
                         hasil_ssml = response.text.replace("```xml", "").replace("```ssml", "").replace("```html", "").replace("```", "").strip()
                         
-                        st.session_state.naskah_vo = hasil_ssml
+                        st.session_state.naskah_vo_editor = hasil_ssml
                         st.success("✅ Ajaib! Naskah visual telah diadaptasi otomatis menjadi skrip SSML siap rekam!")
                     except Exception as e:
-                        st.session_state.naskah_vo = extracted_text
+                        st.session_state.naskah_vo_editor = extracted_text
                         st.warning("⚠️ Gagal mengadaptasi ke SSML otomatis. Menampilkan naskah asli.")
             else:
-                st.session_state.naskah_vo = extracted_text
+                st.session_state.naskah_vo_editor = extracted_text
                 st.success("✅ Naskah SSML ditarik otomatis dari Studio Kreasi Naskah!")
     else:
-        if not st.session_state.naskah_vo:
+        if not st.session_state.naskah_vo_editor:
             st.info("💡 Belum ada naskah dari Studio Kreasi Naskah. Silakan buat naskah dulu atau ketik manual di bawah.")
 
     # --- 3. TAMPILAN ARAHAN, PANDUAN TEKNIS & KOTAK KERJA ---
@@ -219,17 +221,17 @@ Teks Asli:
         """)
 
     st.markdown("**📱 PENGGUNA HP:** Silakan ketuk area teks di bawah ini untuk mengedit. Jika sudah selesai, langsung saja klik tombol **Produksi Suara** di bagian bawah.")
-    user_input = st.text_area(
+    
+    # Perbaikan Editabilitas: Menggunakan "key" bukan "value", agar Streamlit yang mengurus sinkronisasi ketikan 100%
+    st.text_area(
         "📝 Kotak Kerja Naskah (Anda BEBAS mengetik, menghapus, atau mengubah tanda baca di sini):", 
-        value=st.session_state.naskah_vo, 
+        key="naskah_vo_editor", 
         height=350,
         help="Semua perubahan yang Anda ketik di sini akan disimpan otomatis saat Anda menekan tombol produksi."
     )
     
-    st.session_state.naskah_vo = user_input
-    
     # --- INDIKATOR JUMLAH KARAKTER ---
-    jumlah_karakter_kotak = len(user_input)
+    jumlah_karakter_kotak = len(st.session_state.naskah_vo_editor)
     st.caption(f"✍️ **Jumlah karakter di kotak naskah saat ini:** {jumlah_karakter_kotak:,}")
 
     col1, col2, col3 = st.columns(3)
@@ -250,10 +252,10 @@ Teks Asli:
 
     # --- 4. PROSES PRODUKSI AUDIO ---
     if st.button("🔥 Produksi Suara Pro Sekarang", use_container_width=True):
-        if user_input:
+        if st.session_state.naskah_vo_editor:
             
             # Membersihkan tag arahan dalam kurung agar tidak dibaca robot (kecuali format SSML XML)
-            clean_text = re.sub(r'\[.*?\]', '', user_input)
+            clean_text = re.sub(r'\[.*?\]', '', st.session_state.naskah_vo_editor)
             clean_text = re.sub(r'\((?!<).*?\)', '', clean_text) # Menghapus kurung bulat, tapi mengabaikan tag HTML/XML jika ada
             naskah_final = clean_text.strip()
             panjang_teks = len(naskah_final)
