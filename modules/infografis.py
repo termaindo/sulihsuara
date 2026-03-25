@@ -290,9 +290,15 @@ def run():
     st.info("Jika Anda tidak punya foto sendiri, gunakan panduan langkah demi langkah di bawah ini:")
 
     st.markdown("**Langkah 1: Membuat Konsep Konten (Copywriting) Salin teks ini, dengan cara klik icon tumpukan dokumen di sebelah kanan atas kotak di bawah ini dan tempel ke AI**")
-    prompt_copywriting = f"""Saya memiliki naskah produk: '{naskah_mentah}'. Tolong bedah naskah ini menjadi konsep konten infografis yang menarik. Jika naskahnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya. Pastikan di bagian bawah setiap slide memuat stempel paten 2 baris: 
+    
+    # REVISI PROMPT: Menggunakan perintah langsung, memisahkan bahan baku (naskah) di akhir.
+    prompt_copywriting = f"""Tolong bedah teks promosi di bawah ini menjadi konsep konten infografis yang menarik. Jika teksnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya. Pastikan di bagian bawah setiap slide memuat stempel paten 2 baris:
 Baris 1: Studio Kreatif Pro - KTB UKM Jatim
-Baris 2: Instagram: @ktbukm.jatim | Website: https://ktbukm-jatim.store"""
+Baris 2: Instagram: @ktbukm.jatim | Website: https://ktbukm-jatim.store
+
+Berikut teks promosinya:
+{naskah_mentah}"""
+    
     st.code(prompt_copywriting, language="text")
 
     st.markdown("**Langkah 2: Membuat Prompt Gambar (Visual Design)**")
