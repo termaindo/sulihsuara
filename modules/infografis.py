@@ -146,7 +146,7 @@ def render_html_poster(json_slide, base64_img, layout_type, theme_name, mode_fot
     
     # SVG ICONS (Cleaned, no extra text)
     icon_ig = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>'
-    icon_web = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1.001 19.923c-3.324-.431-5.992-2.793-6.817-6.002h2.298c.241 1.488.666 2.822 1.233 3.885-.888-.637-1.646-1.41-2.233-2.283.587.873 1.345 1.646 2.233 2.283.398.745.857 1.405 1.373 1.956-.036.053-.071.104-.107.161zm1.001-1.006c-.846 0-1.637-.621-2.277-1.657-.591-.958-1.026-2.228-1.223-3.66h7c-.197 1.432-.632 2.702-1.223 3.66-.64 1.036-1.431 1.657-2.277 1.657zm8.818-7.002h-2.298c-.241 1.488-.666 2.822-1.233 3.885.888-.637 1.646-1.41 2.233-2.283-.587.873-1.345 1.646-2.233 2.283-.398.745-.857 1.405-1.373 1.956.036.053.071.104.107.161 3.324-.431 5.992-2.793 6.817-6.002zm-10.819-10.923c3.324.431 5.992 2.793 6.817 6.002h-2.298c-.241-1.488-.666-2.822-1.233-3.885.888.637 1.646-1.41 2.233 2.283-.587-.873-1.345-1.646-2.233-2.283-.398-.745-.857-1.405-1.373-1.956.036-.053.071-.104.107-.161zm1.001 1.006c.846 0 1.637.621 2.277 1.657.591.958 1.026 2.228 1.223 3.66h-7c.197-1.432.632-2.702 1.223-3.66.64-1.036 1.431-1.657 2.277-1.657zm-8.818 7.002h2.298c.241-1.488.666-2.822 1.233-3.885-.888.637-1.646 1.41-2.233 2.283.587-.873-1.345-1.646-2.233-2.283.398-.745.857-1.405 1.373-1.956-.036-.053-.071-.104-.107-.161-3.324.431-5.992 2.793-6.817 6.002z"/></svg>'
+    icon_web = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1.001 19.923c-3.324-.431-5.992-2.793-6.817-6.002h2.298c.241 1.488.666 2.822 1.233 3.885-.888-.637-1.646-1.41-2.233-2.283.587.873 1.345 1.646 2.233 2.283.398.745.857 1.405 1.373 1.956-.036.053-.071.104-.107.161zm1.001-1.006c-.846 0-1.637-.621-2.277-1.657-.591-.958-1.026-2.228-1.223-3.66h7c-.197 1.432-.632 2.702-1.223 3.66-.64 1.036-1.431 1.657-2.277 1.657zm8.818-7.002h-2.298c-.241 1.488-.666 2.822-1.233 3.885.888-.637 1.646-1.41 2.233-2.283-.587.873-1.345 1.646-2.233 2.283-.398.745-.857 1.405-1.373 1.956.036.053.071.104.107.161 3.324-.431 5.992-2.793 6.817-6.002zm-10.819-10.923c3.324.431 5.992 2.793 6.817 6.002h-2.298c-.241-1.488-.666-2.822-1.233-3.885.888.637 1.646 1.41 2.233 2.283-.587-.873-1.345-1.646-2.233-2.283-.398-.745-.857-1.405-1.373-1.956.036-.053.071-.104.107-.161zm1.001 1.006c.846 0 1.637.621 2.277 1.657.591.958 1.026 2.228 1.223 3.66h-7c.197-1.432.632-2.702 1.223-3.66.64-1.036 1.431-1.657 2.277-1.657zm-8.818 7.002h2.298c.241-1.488.666-2.822 1.233-3.885-.888.637-1.646 1.41-2.233 2.283.587-.873 1.345-1.646 2.233-2.283.398-.745.857-1.405 1.373-1.956-.036-.053-.071-.104-.107-.161-3.324.431-5.992 2.793-6.817 6.002z"/></svg>'
 
     html = f"""
     {css}
@@ -221,19 +221,62 @@ def run():
             except Exception:
                 st.error("❌ Terjadi gangguan komunikasi dengan Server AI Google.")
 
-    # --- TAMPILAN OUTPUT & DOWNLOAD ---
+    # --- TAMPILAN OUTPUT & DOWNLOAD (KINI MENGUNDUH PNG) ---
     if "infografis_output" in st.session_state:
-        st.components.v1.html(st.session_state.infografis_output, height=850, scrolling=True)
-        
-        st.download_button(
-            label="📥 Unduh Hasil Desain",
-            data=f"<html><body style='margin:0; background:#f0f2f6; display:flex; flex-direction:column; align-items:center; padding:40px;'>{st.session_state.infografis_output}</body></html>",
-            file_name="desain_studio_kreatif.html",
-            mime="text/html",
-            use_container_width=True
-        )
+        # Kita bungkus output dengan script html2canvas untuk memotret desain menjadi PNG
+        html_with_download = f"""
+        <html>
+        <head>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+            <style>
+                body {{ margin:0; background:#f0f2f6; display:flex; flex-direction:column; align-items:center; padding:20px 0; font-family: sans-serif; }}
+                .download-btn {{
+                    background-color: #ff4b4b; color: white; border: none; padding: 12px 24px;
+                    font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer;
+                    margin-top: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    transition: 0.3s;
+                }}
+                .download-btn:hover {{ background-color: #ff3333; box-shadow: 0 6px 12px rgba(0,0,0,0.2); }}
+            </style>
+        </head>
+        <body>
+            <button class="download-btn" onclick="downloadImage()">📥 Unduh Hasil Desain (PNG)</button>
+            
+            <div id="capture-area" style="display:flex; flex-direction:column; align-items:center; width:100%; padding:20px;">
+                {st.session_state.infografis_output}
+            </div>
+            
+            <script>
+                function downloadImage() {{
+                    const btn = document.querySelector('.download-btn');
+                    const originalText = btn.innerText;
+                    btn.innerText = "⏳ Sedang Memproses Gambar...";
+                    
+                    /* Mengambil screenshot dari area desain */
+                    html2canvas(document.getElementById("capture-area"), {{
+                        scale: 2, /* Memastikan gambar PNG yang diunduh beresolusi HD/Tinggi */
+                        useCORS: true,
+                        backgroundColor: "#f0f2f6"
+                    }}).then(canvas => {{
+                        let link = document.createElement('a');
+                        link.download = 'Desain_Studio_Kreatif.png';
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        btn.innerText = originalText;
+                    }}).catch(err => {{
+                        console.error("Error: ", err);
+                        btn.innerText = "❌ Gagal Mengunduh";
+                    }});
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        # Render frame HTML setinggi 950px untuk memberikan ruang ekstra pada tombol
+        st.components.v1.html(html_with_download, height=950, scrolling=True)
 
-    # --- PANDUAN 2 LANGKAH MANUAL ---
+
+    # --- PANDUAN 2 LANGKAH MANUAL (STRUKTUR DISIPLIN) ---
     st.divider()
     st.markdown("### 🤖 Instruksi Praktis (Copas ke Gemini Pribadi Anda)")
     st.info("Jika Anda tidak punya foto sendiri, gunakan panduan langkah demi langkah di bawah ini:")
