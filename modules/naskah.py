@@ -277,7 +277,9 @@ Kamu WAJIB membungkus naskah final di dalam kotak kode (markdown code block) den
                         else:
                             st.error(f"❌ Terjadi kesalahan saat menghubungi AI: {e}")
         else:
-            st.markdown(st.session_state.hasil_naskah)
+            # Membuka peluang untuk diedit oleh user dan menyimpannya langsung ke session_state
+            edited_text = st.text_area("📝 Naskah Final (Silakan edit langsung di dalam kotak ini jika diperlukan):", value=st.session_state.hasil_naskah, height=400, key="ta_hasil_final")
+            st.session_state.hasil_naskah = edited_text
 
             st.divider()
             st.info("🛠️ **Opsi Perubahan Naskah:**\nAnda bisa membuat ulang untuk produk/jasa lain, atau mengubah platform/format untuk produk ini (misal: dari WA ke Infografis) tanpa mengetik ulang info dari awal.")
