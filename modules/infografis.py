@@ -40,11 +40,13 @@ def process_product_image(uploaded_file):
 # ==========================================
 # FUNGSI: ANALISIS TEKS (GEMINI 2.5 FLASH)
 # ==========================================
-def generate_json_structure(naskah):
+def generate_json_structure(naskah, platform, jumlah_slide, cta):
     model = genai.GenerativeModel('gemini-2.5-flash')
     prompt = f"""
     Ubah naskah promosi berikut menjadi struktur JSON murni.
-    Jika naskah panjang, buatkan menjadi urutan slide (carousel) maksimal 3 slide.
+    Sesuaikan bahasa untuk platform: {platform}.
+    PENTING: Buatkan urutan TEPAT sejumlah {jumlah_slide}.
+    PENTING: Pastikan menyertakan informasi Call to Action (CTA) berikut pada slide yang sesuai: '{cta}'.
     
     Format wajib (JSON Array):
     [
@@ -127,25 +129,15 @@ def get_theme_css(theme_name, layout_type, mode_foto):
             line-height: 1.5; border-left: 6px solid {t['text']}; box-sizing: border-box;
         }}
         .poster-footer {{ 
-            text-align: center; font-size: 0.72em; border-top: 1px solid rgba(128,128,128,0.3); 
-            padding-top: 15px; font-weight: 600; line-height: 1.6;
+            text-align: center; font-size: 0.75em; border-top: 1px solid rgba(128,128,128,0.3); 
+            padding-top: 15px; font-weight: 600; line-height: 1.6; opacity: 0.9;
         }}
-        .footer-line-1 {{ margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }}
-        .footer-line-2 {{ 
-            display: flex; align-items: center; justify-content: center; 
-            gap: 8px; opacity: 0.9; font-weight: 500;
-        }}
-        .icon-svg {{ width: 14px; height: 14px; fill: currentColor; vertical-align: middle; }}
     </style>
     """
     return css
 
 def render_single_slide_html(json_slide, base64_img, layout_type, theme_name, mode_foto):
     css = get_theme_css(theme_name, layout_type, mode_foto)
-    
-    icon_ig = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>'
-    icon_web = '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-1.001 19.923c-3.324-.431-5.992-2.793-6.817-6.002h2.298c.241 1.488.666 2.822 1.233 3.885-.888-.637-1.646-1.41-2.233-2.283.587.873 1.345 1.646 2.233 2.283.398.745.857 1.405 1.373 1.956-.036.053-.071.104-.107.161zm1.001-1.006c-.846 0-1.637-.621-2.277-1.657-.591-.958-1.026-2.228-1.223-3.66h7c-.197 1.432-.632 2.702-1.223 3.66-.64 1.036-1.431 1.657-2.277 1.657zm8.818-7.002h-2.298c-.241 1.488-.666 2.822-1.233 3.885.888-.637 1.646-1.41 2.233-2.283-.587.873-1.345 1.646-2.233 2.283-.398.745-.857 1.405-1.373 1.956.036.053.071.104.107.161 3.324-.431 5.992-2.793 6.817-6.002zm-10.819-10.923c3.324.431 5.992 2.793 6.817 6.002h-2.298c-.241-1.488-.666-2.822-1.233-3.885.888.637 1.646 1.41 2.233 2.283-.587-.873-1.345-1.646-2.233-2.283-.398-.745-.857-1.405-1.373-1.956.036-.053.071-.104.107-.161zm1.001 1.006c.846 0 1.637.621 2.277 1.657.591.958 1.026 2.228 1.223 3.66h-7c.197-1.432.632-2.702 1.223-3.66.64-1.036 1.431-1.657 2.277-1.657zm-8.818 7.002h2.298c.241-1.488.666-2.822 1.233-3.885-.888.637-1.646 1.41-2.233 2.283.587-.873 1.345-1.646 2.233-2.283.398-.745.857-1.405 1.373-1.956-.036-.053-.071-.104-.107-.161-3.324.431-5.992 2.793-6.817 6.002z"/></svg>'
-
     items_html = "".join([f"<div class='item-box'>✓ {i}</div>" for i in json_slide.get("items", [])])
     
     html = f"""
@@ -157,10 +149,7 @@ def render_single_slide_html(json_slide, base64_img, layout_type, theme_name, mo
             <div class="items-container">{items_html}</div>
         </div>
         <div class="poster-footer">
-            <div class="footer-line-1">Studio Kreatif Pro - KTB UKM Jatim</div>
-            <div class="footer-line-2">
-                {icon_ig} @ktbukm.jatim &nbsp; | &nbsp; {icon_web} https://ktbukm-jatim.store
-            </div>
+            dibuat dengan Studio Kreatif Pro (https://s.id/bikinpromo)
         </div>
     </div>
     """
@@ -176,12 +165,21 @@ def run():
     naskah_mentah = st.session_state.get("hasil_naskah", "")
     if not naskah_mentah:
         st.info("ℹ️ Silakan buat naskah di Ruang 1 terlebih dahulu.")
-        naskah_mentah = "Produk Unggulan UMKM Jawa Timur."
+        naskah_mentah = "Produk Unggulan UMKM."
 
     st.markdown("---")
+    st.markdown("### 1. Pengaturan Produksi")
+    
+    col_plat, col_slide = st.columns(2)
+    with col_plat:
+        platform_choice = st.selectbox("Platform & Tujuan:", ["Instagram Post / Carousel", "WhatsApp Status / Story", "Brosur / Poster Cetak", "Facebook Post"])
+    with col_slide:
+        jumlah_slide = st.selectbox("Jumlah Slide:", ["1 Slide", "2 Slide", "3 Slide", "4 Slide", "5 Slide"])
+        
+    cta_input = st.text_input("Call to Action (Cara Pesan/Beli):", placeholder="Contoh: Hubungi WA 0812... atau Beli di Shopee/Tokopedia...")
+
     st.warning("📸 **Panduan Foto:** Gunakan latar belakang putih polos untuk hasil transparan instan pada mode 'Studio'.")
     
-    st.markdown("### 1. Pengaturan Produksi")
     mode_foto = st.radio(
         "Jenis Foto Produk:", ["Foto Studio (Latar Putih)", "Foto Estetik / Sudah Ada Latar"],
         horizontal=True
@@ -198,11 +196,13 @@ def run():
     if st.button("🚀 Buat Desain Visual Sekarang!", type="primary"):
         if not uploaded_file:
             st.warning("⚠️ Unggah foto produk terlebih dahulu.")
+        elif not cta_input:
+            st.warning("⚠️ Mohon isi kotak Call to Action (Cara Pesan/Beli) terlebih dahulu.")
         else:
             try:
                 with st.spinner("⚙️ Direktur kreatif sedang memproduksi visual cetakan..."):
                     base64_img = process_product_image(uploaded_file)
-                    json_data = generate_json_structure(naskah_mentah)
+                    json_data = generate_json_structure(naskah_mentah, platform_choice, jumlah_slide, cta_input)
                     
                     if isinstance(json_data, dict) and json_data.get("error") == "429":
                         st.error("⏳ **Server Google sedang mendinginkan mesin, mohon tunggu 1 menit lalu tekan tombolnya lagi.**")
@@ -295,19 +295,23 @@ def run():
 
     # LANGKAH 2
     st.markdown("**Langkah 2: Siapkan Konsep Konten**")
-    punya_logo = st.radio("Apakah Anda memiliki file logo KTB UKM Jatim untuk dipasang secara manual nanti?", ["Ya, saya punya", "Tidak, saya tidak punya"])
+    
+    # Text fallback if variables are empty to prevent breaking the prompt format
+    safe_platform = platform_choice if 'platform_choice' in locals() else "Platform Media Sosial"
+    safe_jumlah = jumlah_slide if 'jumlah_slide' in locals() else "beberapa Slide"
+    safe_cta = cta_input if 'cta_input' in locals() and cta_input else "Hubungi kami segera"
+    
+    punya_logo = st.radio("Apakah Anda memiliki file logo merek sendiri untuk dipasang secara manual nanti?", ["Ya, saya punya", "Tidak, saya tidak punya"])
     
     if punya_logo == "Ya, saya punya":
-        prompt_copywriting = f"""Tolong bedah teks promosi di bawah ini menjadi konsep konten infografis yang menarik. Jika teksnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya. Pastikan di bagian bawah setiap slide memuat stempel paten 2 baris:
-Studio Kreatif Pro - KTB UKM Jatim
-Instagram: @ktbukm.jatim | Website: https://ktbukm-jatim.store
+        prompt_copywriting = f"""Tolong bedah teks promosi di bawah ini menjadi konsep konten infografis yang menarik untuk {safe_platform}. Buatkan tepat sejumlah {safe_jumlah}. Tentukan judul yang memikat, poin-poin manfaat, dan gunakan Call to Action (CTA): '{safe_cta}' untuk slide penutupnya. Pastikan di bagian bawah setiap slide memuat stempel:
+dibuat dengan Studio Kreatif Pro (https://s.id/bikinpromo)
 
 Berikut teks promosinya:
 {naskah_mentah}"""
     else:
-        prompt_copywriting = f"""Tolong bedah teks promosi di bawah ini menjadi konsep konten infografis yang menarik. Jika teksnya panjang, buatkan menjadi urutan 3-5 slide (carousel). Tentukan judul yang memikat, poin-poin manfaat, dan ajakan bertindak (CTA) untuk setiap slidenya. Buat konsep desain TANPA keharusan memasang logo KTB UKM Jatim di pojok kanan atas. Namun, pastikan di bagian bawah setiap slide memuat stempel paten 2 baris:
-Studio Kreatif Pro - KTB UKM Jatim
-Instagram: @ktbukm.jatim | Website: https://ktbukm-jatim.store
+        prompt_copywriting = f"""Tolong bedah teks promosi di bawah ini menjadi konsep konten infografis yang menarik untuk {safe_platform}. Buatkan tepat sejumlah {safe_jumlah}. Tentukan judul yang memikat, poin-poin manfaat, dan gunakan Call to Action (CTA): '{safe_cta}' untuk slide penutupnya. Buat konsep desain TANPA keharusan memasang logo di pojok kanan atas. Namun, pastikan di bagian bawah setiap slide memuat stempel:
+dibuat dengan Studio Kreatif Pro (https://s.id/bikinpromo)
 
 Berikut teks promosinya:
 {naskah_mentah}"""
